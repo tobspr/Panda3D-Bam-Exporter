@@ -2,7 +2,7 @@
 bl_info = {
     "name": "Panda3D Bam Exporter (PBE)",
     "description": "Import / Export Panda3D bam files",
-    "author": "Tobias Springer",
+    "author": "tobspr",
     "version": (1, 0, 0),
     "blender": (2, 72, 2),
     "location": "File > Import & File > Export",
@@ -12,14 +12,31 @@ bl_info = {
 }
 
 
-
-import importlib
+import os
+import sys
 import bpy
+import importlib
 from bpy.props import *
 from bpy_extras.io_utils import ExportHelper
 
-from .PBEExportException import PBEExportException
-from .PBESceneWriter import PBESceneWriter
+
+# Check if we already imported the libraries
+if "PBESceneWriter" not in locals():
+
+    # Add the current path to the sys path. This ensures we can load the modules 
+    # from the current directory
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, os.path.join(plugin_dir))
+
+    # Now import the required libs
+    import PBEExportException
+    import PBESceneWriter
+
+else:
+    # If we already imported the libs, just reload them (but don't modify the path again)
+    importlib.reload(PBEExportException)
+    importlib.reload(PBESceneWriter)
+
 
 
 class PBEExportSettings(bpy.types.PropertyGroup):
@@ -69,13 +86,13 @@ class PBEExportOperator(bpy.types.Operator, ExportHelper):
 
         # Try to execute the export process
         try:    
-            writer = PBESceneWriter()
+            writer = PBESceneWriter.PBESceneWriter()
             writer.set_context(bpy.context)
             writer.set_settings(scene.pbe)
             writer.set_filepath(self.filepath)
             writer.set_objects(objects)
             writer.write_bam_file()
-        except PBEExportException as err:
+        except PBEExportException.PBEExportException as err:
             self.report({'ERROR'}, err.message)
             return {'CANCELLED'}
 
@@ -89,6 +106,9 @@ class PBEExportOperator(bpy.types.Operator, ExportHelper):
         
 def PBEExportFuncCallback(self, context):
     self.layout.operator(PBEExportOperator.bl_idname, text="Panda3D (.bam)")
+
+
+
 
 def register():
     print("Registering export properties")
