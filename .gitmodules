@@ -1,0 +1,3 @@
+[submodule "pybamwriter"]
+	path = pybamwriter
+	url = https://github.com/rdb/pybamwriter
