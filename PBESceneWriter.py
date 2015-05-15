@@ -4,7 +4,7 @@ import bmesh
 
 
 from PBEExportException import PBEExportException
-from pybamwriter.panda_types import TransformState
+from pybamwriter.panda_types import TransformState, Material
 
 class PBESceneWriter:
 
@@ -68,6 +68,31 @@ class PBESceneWriter:
         print("Handle object:", obj.name)
         self._handle_mesh(obj)
 
+    def _handle_material(self, material):
+        """ Converts a blender material to a panda material """
+        virtual_material = Material()
+        virtual_material.diffuse = (
+            material.diffuse_color[0] * material.diffuse_intensity, 
+            material.diffuse_color[1] * material.diffuse_intensity,
+            material.diffuse_color[2] * material.diffuse_intensity,
+            material.alpha)
+        virtual_material.ambient = (
+            material.ambient,
+            material.ambient,
+            material.ambient,
+            1.0)
+        virtual_material.specular = (
+            material.specular_color[0] * material.specular_intensity,
+            material.specular_color[1] * material.specular_intensity,
+            material.specular_color[2] * material.specular_intensity,
+            material.specular_alpha)
+        virtual_material.emissive = (
+            material.emit,
+            material.emit,
+            material.emit,
+            1.0)
+        return virtual_material
+
     def _handle_mesh(self, obj):
         """ Internal method to process a mesh during the export process """
 
@@ -117,8 +142,12 @@ class PBESceneWriter:
         # Create the different geoms, 1 per material
         for index, slot in enumerate(obj.material_slots):
             if slot and slot.material:
+                
 
-                pass
+                virtual_material = self._handle_material(slot.material) 
+                print(virtual_material.diffuse)
+
+
 
 
 
