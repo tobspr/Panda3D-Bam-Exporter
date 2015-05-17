@@ -1,6 +1,7 @@
 
 import os
 import bmesh
+import time
 from array import array
 
 from PBEExportException import PBEExportException
@@ -17,6 +18,11 @@ class PBESceneWriter:
     def __init__(self):
         """ Creates a new scene writer """
         self._create_default_array_formats()
+        self._stats_exported_vertices = 0
+        self._stats_exported_tris = 0
+        self._stats_exported_objs = 0
+        self._stats_exported_geoms = 0
+        self._material_state_cache = {}
 
     def set_filepath(self, filepath):
         """ Sets the filepath used to store the bam file. In future, the writer
@@ -43,6 +49,7 @@ class PBESceneWriter:
         
         # Make the output easier to read - just for debugging!
         os.system("cls")
+        start_time = time.time()
 
         # Create the root of our model. All objects will be parented to this
         self.virtual_model_root = ModelRoot("SceneRoot")
@@ -55,6 +62,15 @@ class PBESceneWriter:
         writer.open_file(self.filepath)
         writer.write_object(self.virtual_model_root)
         writer.close()
+
+        end_time = time.time()
+        duration = round(end_time - start_time, 2)
+
+
+        print("Export finished in", duration, "seconds.")
+        print("Exported", self._stats_exported_vertices, "Vertices and", self._stats_exported_tris, "Triangles")
+        print("Exported", self._stats_exported_objs, "Objects and", self._stats_exported_geoms, "Geoms")
+        print("Total materials:", len(self._material_state_cache.keys()))
 
         raise PBEExportException("Not implemented yet")
 
@@ -82,7 +98,9 @@ class PBESceneWriter:
 
     def _handle_object(self, obj):
         """ Internal method to process an object during the export process """
-        print("Handle object:", obj.name)
+        print("Export object:", obj.name)
+
+        self._stats_exported_objs += 1
 
         if obj.type == "CAMERA":
             self._handle_camera(obj)
@@ -92,7 +110,6 @@ class PBESceneWriter:
             self._handle_mesh(obj)
         else:
             raise PBEExportException("Object " + obj.name + " has a non implemented type: '" + obj.type + "'")
-
 
     def _create_default_array_formats(self):
         """ Creates the default GeomVertexArrayFormats, so we do not have to 
@@ -123,8 +140,12 @@ class PBESceneWriter:
         self.gvd_formats['index32'].add_column("index", 1, GeomEnums.NT_uint32, 
             GeomEnums.C_index, start = 0, column_alignment = 1)
 
-    def _handle_material(self, material):
-        """ Converts a blender material to a panda material """
+    def _create_state_from_material(self, material):
+        """ Creates a render state based on a material """
+
+        if material.name in self._material_state_cache:
+            return self._material_state_cache[material.name]
+
         virtual_material = Material()
         virtual_material.diffuse = (
             material.diffuse_color[0] * material.diffuse_intensity, 
@@ -146,7 +167,10 @@ class PBESceneWriter:
             material.emit,
             material.emit,
             1.0)
-        return virtual_material
+        virtual_state = RenderState(MaterialAttrib(virtual_material))
+        self._material_state_cache[material.name] = virtual_state
+
+        return virtual_state
 
     def _create_geom_from_polygons(self, mesh, polygons, uv_coordinates = None):
         """ Creates a Geom from a set of polygons. If uv_coordinates is not None,
@@ -176,6 +200,7 @@ class PBESceneWriter:
 
             # Check if the polygon uses smooth shading
             is_smooth = poly.use_smooth
+            is_smooth = True
 
             # Iterate over the 3 vertices of that triangle
             for vertex_index in poly.vertices:
@@ -217,7 +242,7 @@ class PBESceneWriter:
 
             num_triangles += 1
 
-        print("Triangles=", num_triangles, "Vertices=", num_vertices)
+        # print("Triangles=", num_triangles, "Vertices=", num_vertices)
 
         # Determine the right vertex format
         # TODO: Check wheter an uv-map is active and select a format with texcoords
@@ -249,6 +274,10 @@ class PBESceneWriter:
         geom = Geom(vertex_data)
         geom.primitives.append(triangles)
 
+        self._stats_exported_vertices += num_vertices
+        self._stats_exported_tris += num_triangles
+        self._stats_exported_geoms += 1
+
         return geom
 
 
@@ -258,6 +287,7 @@ class PBESceneWriter:
         # Create the transform state
         transformState = TransformState()
         transformState.mat = obj.matrix_world
+
 
         # Convert the object to a mesh, so we can read the polygons
         mesh = obj.to_mesh(self.context.scene, 
@@ -293,7 +323,7 @@ class PBESceneWriter:
         mesh.calc_normals()
 
         # Create a new geom node to store all geoms
-        virtual_geom_node = GeomNode()
+        virtual_geom_node = GeomNode(obj.name)
         virtual_geom_node.transform = transformState
 
         # Create the different geoms, 1 per material
@@ -306,33 +336,21 @@ class PBESceneWriter:
             # Create a virtual material if the slot contains a material. Otherwise
             # just an empty material
             if slot and slot.material:
-                virtual_material = self._handle_material(slot.material)
+                render_state = self._create_state_from_material(slot.material)
             else:
-                virtual_material = Material()
+                render_state = RenderState.empty
 
+            # Extract the per-material polygon list
             polygons = polygons_by_material[index]
 
-            # Create the geom render state
-            virtual_render_state = RenderState()
-            virtual_render_state.attributes.append(MaterialAttrib(virtual_material))
-
+            # Create a geom from those polygons
             virtual_geom = self._create_geom_from_polygons(mesh, polygons, active_uv_layer)
 
-            virtual_geom_node.add_geom(virtual_geom, virtual_render_state)
+            # Add that geom to the geom node
+            virtual_geom_node.add_geom(virtual_geom, render_state)
 
-            # TODO: Add vertices to the geom
-            # geom_node = GeomNode("Model")
-            # geom_node.add_geom(geom)
-            # geom_node.state = RenderState(ColorAttrib(ColorAttrib.T_flat, (1.0, 0.6, 0.2, 1.0)))
-
-
+        # Finally attach the geom node to the model root
         self.virtual_model_root.add_child(virtual_geom_node)
-
-
-
-
-
-
 
         # TODO: Delete mesh
         # mesh.delete() or sth like that.
