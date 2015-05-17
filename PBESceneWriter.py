@@ -165,7 +165,7 @@ class PBESceneWriter:
             # Iterate over the 3 vertices of that triangle
             for vertex_index in poly.vertices:
 
-                # If the vertex is already know, just write its index
+                # If the vertex is already known, just write its index
                 if vertex_mappings[vertex_index] >= 0:
                     index_buffer.append(vertex_mappings[vertex_index])
 
@@ -178,6 +178,7 @@ class PBESceneWriter:
                     vertex_buffer.append(round(vertex.co[1], 5))
                     vertex_buffer.append(round(vertex.co[2], 5))
 
+                    # Write the vertex normal
                     vertex_buffer.append(round(vertex.normal[0], 5))
                     vertex_buffer.append(round(vertex.normal[1], 5))
                     vertex_buffer.append(round(vertex.normal[2], 5))
@@ -186,7 +187,7 @@ class PBESceneWriter:
                     index_buffer.append(num_vertices)
 
                     # Store the vertex index in the mappings and increment the
-                    # vertex cuonter
+                    # vertex counter
                     vertex_mappings[vertex_index] = num_vertices
                     num_vertices += 1
 
@@ -194,27 +195,32 @@ class PBESceneWriter:
 
         print("Triangles=", num_triangles, "Vertices=", num_vertices)
 
-        #######################################################################
-
+        # Determine the right vertex format
+        # TODO: Check wheter an uv-map is active and select a format with texcoords
+        # then
         vertex_format = self.gvd_formats['v3n3']
 
-
+        # Create the vertex array data, to store the per-vertex data
         array_data = GeomVertexArrayData(vertex_format, GeomEnums.UH_static)
         array_data.buffer += vertex_buffer
 
+        # Create the index array data, to store the per-primitive vertex references
         index_array_data = GeomVertexArrayData(self.gvd_formats['index'], GeomEnums.UH_static)
         index_array_data.buffer += index_buffer
 
+        # Create the array container for the per-vertex data
         vertex_data = GeomVertexData("triangle", GeomVertexFormat(vertex_format), GeomEnums.UH_static)
         vertex_data.arrays.append(array_data)
 
+        # Create the primitive container
         triangles = GeomTriangles(GeomEnums.UH_static)
         triangles.vertices = index_array_data
         triangles.first_vertex = 0
+
+        # The number of vertices obviously equals to thrice the amount of triangles
         triangles.num_vertices = num_triangles * 3
 
-        #######################################################################
-
+        # Create the geom to wrap arround
         geom = Geom(vertex_data)
         geom.primitives.append(triangles)
 
