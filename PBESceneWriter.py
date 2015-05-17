@@ -163,9 +163,9 @@ class PBESceneWriter:
             material.specular_color[2] * material.specular_intensity,
             material.specular_alpha)
         virtual_material.emissive = (
-            material.emit,
-            material.emit,
-            material.emit,
+            material.emit * material.diffuse_color[0] * material.diffuse_intensity,
+            material.emit * material.diffuse_color[1] * material.diffuse_intensity,
+            material.emit * material.diffuse_color[2] * material.diffuse_intensity,
             1.0)
         virtual_state = RenderState(MaterialAttrib(virtual_material))
         self._material_state_cache[material.name] = virtual_state
