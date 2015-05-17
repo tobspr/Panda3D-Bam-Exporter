@@ -110,11 +110,18 @@ class PBESceneWriter:
                                 GeomEnums.C_vector, start=3 * 4, column_alignment=4)
 
         self.gvd_formats['index'] = GeomVertexArrayFormat()
-        self.gvd_formats['index'].stride = 4
+        self.gvd_formats['index'].stride = 2
         self.gvd_formats['index'].total_bytes = self.gvd_formats['index'].stride
         self.gvd_formats['index'].pad_to = 1
-        self.gvd_formats['index'].add_column("index", 1, GeomEnums.NT_uint32, 
-            GeomEnums.C_index, start = 0, column_alignment = 4)
+        self.gvd_formats['index'].add_column("index", 1, GeomEnums.NT_uint16, 
+            GeomEnums.C_index, start = 0, column_alignment = 1)
+
+        self.gvd_formats['index32'] = GeomVertexArrayFormat()
+        self.gvd_formats['index32'].stride = 4
+        self.gvd_formats['index32'].total_bytes = self.gvd_formats['index32'].stride
+        self.gvd_formats['index32'].pad_to = 1
+        self.gvd_formats['index32'].add_column("index", 1, GeomEnums.NT_uint32, 
+            GeomEnums.C_index, start = 0, column_alignment = 1)
 
     def _handle_material(self, material):
         """ Converts a blender material to a panda material """
@@ -154,7 +161,12 @@ class PBESceneWriter:
 
         # Create the buffers to store the data inside
         vertex_buffer = array('f')
+
+        # 32 bit
         index_buffer = array('I')
+
+        # 16 bit
+        # index_buffer = array('H')
 
         # Store the location of each mesh vertex 
         vertex_mappings = [-1 for i in range(len(vertices))] 
@@ -162,11 +174,16 @@ class PBESceneWriter:
         # Iterate over all triangles
         for poly in polygons:
 
+            # Check if the polygon uses smooth shading
+            is_smooth = poly.use_smooth
+
             # Iterate over the 3 vertices of that triangle
             for vertex_index in poly.vertices:
 
-                # If the vertex is already known, just write its index
-                if vertex_mappings[vertex_index] >= 0:
+                # If the vertex is already known, just write its index, but only
+                # if the polygon does use smooth shading, otherwise all vertices
+                # are duplicated anyway.
+                if is_smooth and vertex_mappings[vertex_index] >= 0:
                     index_buffer.append(vertex_mappings[vertex_index])
 
                 # If the vertex is not known, store its data and then write its index
@@ -179,9 +196,16 @@ class PBESceneWriter:
                     vertex_buffer.append(round(vertex.co[2], 5))
 
                     # Write the vertex normal
-                    vertex_buffer.append(round(vertex.normal[0], 5))
-                    vertex_buffer.append(round(vertex.normal[1], 5))
-                    vertex_buffer.append(round(vertex.normal[2], 5))
+                    # When smooth shading is enabled, write per vertex normals,
+                    # otherwise write the per-poly normal for all vertices
+                    if is_smooth:
+                        vertex_buffer.append(round(vertex.normal[0], 5))
+                        vertex_buffer.append(round(vertex.normal[1], 5))
+                        vertex_buffer.append(round(vertex.normal[2], 5))
+                    else:
+                        vertex_buffer.append(round(poly.normal[0], 5))
+                        vertex_buffer.append(round(poly.normal[1], 5))
+                        vertex_buffer.append(round(poly.normal[2], 5))
 
                     # Store the vertex index in the triangle data
                     index_buffer.append(num_vertices)
@@ -205,7 +229,7 @@ class PBESceneWriter:
         array_data.buffer += vertex_buffer
 
         # Create the index array data, to store the per-primitive vertex references
-        index_array_data = GeomVertexArrayData(self.gvd_formats['index'], GeomEnums.UH_static)
+        index_array_data = GeomVertexArrayData(self.gvd_formats['index32'], GeomEnums.UH_static)
         index_array_data.buffer += index_buffer
 
         # Create the array container for the per-vertex data
@@ -216,6 +240,7 @@ class PBESceneWriter:
         triangles = GeomTriangles(GeomEnums.UH_static)
         triangles.vertices = index_array_data
         triangles.first_vertex = 0
+        triangles.index_type = GeomEnums.NT_uint32
 
         # The number of vertices obviously equals to thrice the amount of triangles
         triangles.num_vertices = num_triangles * 3
