@@ -26,7 +26,7 @@ if "PBESceneWriter" not in locals():
     # Add the current path to the sys path. This ensures we can load the modules 
     # from the current directory
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, os.path.join(plugin_dir))
+    sys.path.insert(0, plugin_dir)
 
     # Now import the required libs
     import PBEExportException
