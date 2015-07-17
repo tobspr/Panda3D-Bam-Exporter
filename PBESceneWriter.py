@@ -1,4 +1,4 @@
-
+# -*- encoding: utf-8 -*-
 import os
 import bmesh
 import time
@@ -22,7 +22,7 @@ class PBESceneWriter:
         self._stats_exported_tris = 0
         self._stats_exported_objs = 0
         self._stats_exported_geoms = 0
-        self._material_state_cache = {}
+        self.material_state_cache = {}
 
     def set_filepath(self, filepath):
         """ Sets the filepath used to store the bam file. In future, the writer
@@ -66,11 +66,10 @@ class PBESceneWriter:
         end_time = time.time()
         duration = round(end_time - start_time, 2)
 
-
         print("Export finished in", duration, "seconds.")
-        print("Exported", self._stats_exported_vertices, "Vertices and", self._stats_exported_tris, "Triangles")
+        print("Exported", format(self._stats_exported_vertices, ",d"), "Vertices and", format(self._stats_exported_tris, ",d"), "Triangles")
         print("Exported", self._stats_exported_objs, "Objects and", self._stats_exported_geoms, "Geoms")
-        print("Total materials:", len(self._material_state_cache.keys()))
+        print("Total materials:", len(self.material_state_cache.keys()))
 
         raise PBEExportException("Not implemented yet")
 
@@ -96,6 +95,18 @@ class PBESceneWriter:
          """ Internal method to handle a light """
          pass
 
+    def _handle_empty(self, obj):
+         """ Internal method to handle an empty object """
+         pass
+
+    def _handle_curve(self, obj):
+         """ Internal method to handle a curve """
+         pass
+
+    def _handle_font(self, obj):
+        """ Internal method to handle a font """
+        pass
+
     def _handle_object(self, obj):
         """ Internal method to process an object during the export process """
         print("Export object:", obj.name)
@@ -108,6 +119,12 @@ class PBESceneWriter:
             self._handle_light(obj)
         elif obj.type == "MESH":
             self._handle_mesh(obj)
+        elif obj.type == "EMPTY":
+            self._handle_empty(obj)
+        elif obj.type == "CURVE":
+            self._handle_curve(obj)
+        elif obj.type == "FONT":
+            self._handle_font(obj)
         else:
             raise PBEExportException("Object " + obj.name + " has a non implemented type: '" + obj.type + "'")
 
@@ -126,11 +143,11 @@ class PBESceneWriter:
         self.gvd_formats['v3n3'].add_column("normal", 3, GeomEnums.NT_float32,
                                 GeomEnums.C_vector, start=3 * 4, column_alignment=4)
 
-        self.gvd_formats['index'] = GeomVertexArrayFormat()
-        self.gvd_formats['index'].stride = 2
-        self.gvd_formats['index'].total_bytes = self.gvd_formats['index'].stride
-        self.gvd_formats['index'].pad_to = 1
-        self.gvd_formats['index'].add_column("index", 1, GeomEnums.NT_uint16, 
+        self.gvd_formats['index16'] = GeomVertexArrayFormat()
+        self.gvd_formats['index16'].stride = 2
+        self.gvd_formats['index16'].total_bytes = self.gvd_formats['index16'].stride
+        self.gvd_formats['index16'].pad_to = 1
+        self.gvd_formats['index16'].add_column("index", 1, GeomEnums.NT_uint16, 
             GeomEnums.C_index, start = 0, column_alignment = 1)
 
         self.gvd_formats['index32'] = GeomVertexArrayFormat()
@@ -143,8 +160,14 @@ class PBESceneWriter:
     def _create_state_from_material(self, material):
         """ Creates a render state based on a material """
 
-        if material.name in self._material_state_cache:
-            return self._material_state_cache[material.name]
+        try:
+            material_name = material.name.encode('utf-8', 'replace')
+        except UnicodeDecodeError:
+            print("Error decoding material name")
+            material_name ="ERRROR"
+
+        if material_name in self.material_state_cache:
+            return self.material_state_cache[material_name]
 
         virtual_material = Material()
         virtual_material.diffuse = (
@@ -168,13 +191,22 @@ class PBESceneWriter:
             material.emit * material.diffuse_color[2] * material.diffuse_intensity,
             1.0)
         virtual_state = RenderState(MaterialAttrib(virtual_material))
-        self._material_state_cache[material.name] = virtual_state
+        self.material_state_cache[material_name] = virtual_state
 
         return virtual_state
 
     def _create_geom_from_polygons(self, mesh, polygons, uv_coordinates = None):
         """ Creates a Geom from a set of polygons. If uv_coordinates is not None,
         texcoords will be written aswell """
+
+        # Compute the maximum possible amount of vertices for this geom. If it 
+        # extends the range of 16 bit, we have to use 32 bit indices
+        use_32_bit_indices = False
+        max_possible_vtx_count = len(polygons) * 3
+
+        if max_possible_vtx_count >= 2**16 - 1:
+            use_32_bit_indices = True
+            print("Hint: using 32 bit indices for large geom")
 
         # Create handles to the data, this makes accessing it faster
         vertices = mesh.vertices
@@ -184,13 +216,12 @@ class PBESceneWriter:
         num_vertices = 0
 
         # Create the buffers to store the data inside
+        if use_32_bit_indices:
+            index_buffer = array('I') # Unsigned Int
+        else:
+            index_buffer = array('H') # Unsigned Short
+
         vertex_buffer = array('f')
-
-        # 32 bit
-        index_buffer = array('I')
-
-        # 16 bit
-        # index_buffer = array('H')
 
         # Store the location of each mesh vertex 
         vertex_mappings = [-1 for i in range(len(vertices))] 
@@ -200,7 +231,6 @@ class PBESceneWriter:
 
             # Check if the polygon uses smooth shading
             is_smooth = poly.use_smooth
-            is_smooth = True
 
             # Iterate over the 3 vertices of that triangle
             for vertex_index in poly.vertices:
@@ -216,21 +246,21 @@ class PBESceneWriter:
                     vertex = vertices[vertex_index]
 
                     # Write the vertex object position
-                    vertex_buffer.append(round(vertex.co[0], 5))
-                    vertex_buffer.append(round(vertex.co[1], 5))
-                    vertex_buffer.append(round(vertex.co[2], 5))
+                    vertex_buffer.append(vertex.co[0])
+                    vertex_buffer.append(vertex.co[1])
+                    vertex_buffer.append(vertex.co[2])
 
                     # Write the vertex normal
                     # When smooth shading is enabled, write per vertex normals,
                     # otherwise write the per-poly normal for all vertices
                     if is_smooth:
-                        vertex_buffer.append(round(vertex.normal[0], 5))
-                        vertex_buffer.append(round(vertex.normal[1], 5))
-                        vertex_buffer.append(round(vertex.normal[2], 5))
+                        vertex_buffer.append(vertex.normal[0])
+                        vertex_buffer.append(vertex.normal[1])
+                        vertex_buffer.append(vertex.normal[2])
                     else:
-                        vertex_buffer.append(round(poly.normal[0], 5))
-                        vertex_buffer.append(round(poly.normal[1], 5))
-                        vertex_buffer.append(round(poly.normal[2], 5))
+                        vertex_buffer.append(poly.normal[0])
+                        vertex_buffer.append(poly.normal[1])
+                        vertex_buffer.append(poly.normal[2])
 
                     # Store the vertex index in the triangle data
                     index_buffer.append(num_vertices)
@@ -242,19 +272,21 @@ class PBESceneWriter:
 
             num_triangles += 1
 
-        # print("Triangles=", num_triangles, "Vertices=", num_vertices)
-
         # Determine the right vertex format
         # TODO: Check wheter an uv-map is active and select a format with texcoords
         # then
         vertex_format = self.gvd_formats['v3n3']
+        index_format = self.gvd_formats['index16']
+
+        if use_32_bit_indices:
+            index_format = self.gvd_formats['index32']
 
         # Create the vertex array data, to store the per-vertex data
         array_data = GeomVertexArrayData(vertex_format, GeomEnums.UH_static)
         array_data.buffer += vertex_buffer
 
         # Create the index array data, to store the per-primitive vertex references
-        index_array_data = GeomVertexArrayData(self.gvd_formats['index32'], GeomEnums.UH_static)
+        index_array_data = GeomVertexArrayData(index_format, GeomEnums.UH_static)
         index_array_data.buffer += index_buffer
 
         # Create the array container for the per-vertex data
@@ -265,7 +297,11 @@ class PBESceneWriter:
         triangles = GeomTriangles(GeomEnums.UH_static)
         triangles.vertices = index_array_data
         triangles.first_vertex = 0
-        triangles.index_type = GeomEnums.NT_uint32
+
+        # Make sure to set the correct index type on the primitive, otherwise 
+        # it will assume 16 bit indices
+        if use_32_bit_indices:
+            triangles.index_type = GeomEnums.NT_uint32
 
         # The number of vertices obviously equals to thrice the amount of triangles
         triangles.num_vertices = num_triangles * 3
@@ -326,8 +362,15 @@ class PBESceneWriter:
         virtual_geom_node = GeomNode(obj.name)
         virtual_geom_node.transform = transformState
 
+        # Extract material slots, but ensure there is always one slot, so objects
+        # with no actual material get exported, too
+        material_slots = obj.material_slots
+
+        if len(material_slots) == 0:
+            material_slots = [None]
+
         # Create the different geoms, 1 per material
-        for index, slot in enumerate(obj.material_slots):
+        for index, slot in enumerate(material_slots):
 
             # Skip the material slot if no polygon references it
             if len(polygons_by_material[index]) < 1:
