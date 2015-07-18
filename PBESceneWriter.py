@@ -1,7 +1,9 @@
 # -*- encoding: utf-8 -*-
 import os
 import bmesh
+import bpy
 import time
+import shutil
 from array import array
 
 from PBEExportException import PBEExportException
@@ -23,6 +25,7 @@ class PBESceneWriter:
         self._stats_exported_objs = 0
         self._stats_exported_geoms = 0
         self.material_state_cache = {}
+        self.textures_cache = {}
 
     def set_filepath(self, filepath):
         """ Sets the filepath used to store the bam file. In future, the writer
@@ -143,6 +146,17 @@ class PBESceneWriter:
         self.gvd_formats['v3n3'].add_column("normal", 3, GeomEnums.NT_float32,
                                 GeomEnums.C_vector, start=3 * 4, column_alignment=4)
 
+        self.gvd_formats['v3n3t2'] = GeomVertexArrayFormat()
+        self.gvd_formats['v3n3t2'].stride = 4 * 3 * 2 + 4 * 2
+        self.gvd_formats['v3n3t2'].total_bytes = self.gvd_formats['v3n3t2'].stride
+        self.gvd_formats['v3n3t2'].pad_to = 1
+        self.gvd_formats['v3n3t2'].add_column("vertex", 3, GeomEnums.NT_float32,
+                                GeomEnums.C_point, start=0, column_alignment=4)
+        self.gvd_formats['v3n3t2'].add_column("normal", 3, GeomEnums.NT_float32,
+                                GeomEnums.C_vector, start=3 * 4, column_alignment=4)
+        self.gvd_formats['v3n3t2'].add_column("texcoord", 2, GeomEnums.NT_float32,
+                                GeomEnums.C_texcoord, start=2 * 3 * 4, column_alignment=4)
+
         self.gvd_formats['index16'] = GeomVertexArrayFormat()
         self.gvd_formats['index16'].stride = 2
         self.gvd_formats['index16'].total_bytes = self.gvd_formats['index16'].stride
@@ -157,18 +171,201 @@ class PBESceneWriter:
         self.gvd_formats['index32'].add_column("index", 1, GeomEnums.NT_uint32, 
             GeomEnums.C_index, start = 0, column_alignment = 1)
 
+    def _convert_to_panda_filepath(self, filepath):
+        filepath = filepath.replace("\\", "/")
+        if ":/" in filepath:
+            idx = filepath.index(":/")
+            filepath = "/" + filepath[0:idx].lower() + "/" + filepath[idx+2:]
+
+        # Blender indicates relative paths with a double slash
+        if filepath.startswith("//"):
+            filepath = "./" + filepath[2:]
+
+        return filepath
+
+    def _convert_blender_file_format(self, extension):
+        """ Converts a blender format like JPEG to an extension like .jpeg """
+
+        extensions = {
+            "BMP": ".bmp",
+            "PNG": ".png",
+            "JPEG": ".jpg",
+            "TARGA": ".tga",
+            "TIFF": ".tiff"
+        }
+
+        if extension in extensions:
+            return extensions[extension]
+
+        # In case we can't find the extension, return png
+        print("Warning: Unkown blender file format:", extension)
+        return ".png"
+
+    def _save_image(self, image):
+        """ Saves an image to the disk """
+
+        # Fetch old filename first
+        old_filename = bpy.path.abspath(image.filepath)
+
+        # Extract image name from filepath and create a new filename
+        tex_name = bpy.path.basename(old_filename)
+        dest_filename = os.path.join(os.path.dirname(self.filepath), str(self.settings.tex_copy_path), tex_name)
+
+        # Check if the target directory exists, and if not, create it
+        target_dir = os.path.dirname(dest_filename)
+        if not os.path.isdir(target_dir):
+            os.makedirs(target_dir)
+
+        # In case the file is found on disk, just copy it
+        if os.path.isfile(old_filename):
+
+            # If there is already a file at the location, delete that first
+            if os.path.isfile(dest_filename):
+                os.remove(dest_filename)
+
+            print("copy",old_filename,"to", dest_filename)
+            shutil.copyfile(old_filename, dest_filename)
+
+        # When its not on disk, try to use the image.save() function
+        else:
+
+            # Make a copy of the image and try to save that
+            copy = image.copy()
+
+            # Adjust filepath extension
+            extension = self._convert_blender_file_format(copy.file_format)
+            dest_filename = ".".join(dest_filename.split(".")[:-1]) + extension
+
+            print("save image copy to", dest_filename)
+            copy.filepath_raw = dest_filename
+
+            # Finally try to save the image
+            try:
+                copy.save_render(filepath=dest_filename)
+            except Exception as msg:
+                raise PBEExportException("Error during image export: " + str(msg))
+
+        return dest_filename
+
+    def _create_sampler_state_from_texture_slot(self, texture_slot):
+        """ Creates a sampler state from a given texture slot """
+        state = SamplerState()
+        state.wrap_u = SamplerState.WM_repeat
+        state.wrap_v = SamplerState.WM_repeat
+        state.wrap_w = SamplerState.WM_repeat
+        return state
+
+    def _create_texture_from_image(self, image):
+        """ Creates a texture object from a given image """
+
+        mode = str(self.settings.tex_mode)
+        texture = Texture(image.name)
+        is_packed = image.packed_file is not None
+        current_dir = os.path.dirname(self.filepath)
+
+
+        # In case we store absolute filepaths
+        if mode == "ABSOLUTE":
+
+            # When the image is packed, write it to disk first
+            if is_packed:
+                texture.filename = self._convert_to_panda_filepath(self._save_image(image))
+
+            # Otherwise just convert the filename
+            else:
+                src = bpy.path.abspath(image.filepath)
+                src = self._convert_to_panda_filepath(src)
+                texture.filename = src
+
+        elif mode == "RELATIVE":
+
+            # When the image is packed, write it to disk first
+            if is_packed:
+                abs_filename = self._save_image(image)
+                rel_filename = bpy.path.relpath(abs_filename, start=current_dir)
+                texture.filename = self._convert_to_panda_filepath(rel_filename)
+            
+            # Otherwise just convert the filename
+            else:
+                src = bpy.path.abspath(image.filepath)
+                rel_src = bpy.path.relpath(src, start=current_dir)
+                texture.filename = self._convert_to_panda_filepath(rel_src)
+                        
+        elif mode == "COPY":
+            
+            # When copying textures, we just write all textures to disk
+            abs_filename = self._save_image(image)
+            rel_filename = bpy.path.relpath(abs_filename, start=current_dir)
+            texture.filename = self._convert_to_panda_filepath(rel_filename)
+
+        elif mode == "INCLUDE":
+            raise PBEExportException("Texture mode INCLUDE is not supported yet!")
+        elif mode == "KEEP":
+            raise PBEExportException("Texture mode KEEP is not supported yet!")
+
+        return texture
+
+    def _create_texture_stage_node_from_texture_slot(self, texture_slot, sort=0):
+        """ Creates a panda texture object from a blender texture object """ 
+
+        # Check if the slot is not empty and a texture is assigned
+        if not texture_slot or not texture_slot.texture or texture_slot.texture.type == "NONE":
+            return None
+
+        # Check if the texture slot mode is supported
+        if texture_slot.texture_coords != "UV":
+            # raise PBEExportException("Unsupported texture coordinate mode for slot '" + texture_slot.name + "': " + texture_slot.texture_coords)
+            return None
+
+        # Create sampler state
+        stage_node = TextureAttrib.StageNode()
+        stage_node.sampler = self._create_sampler_state_from_texture_slot(texture_slot)
+        stage_node.texture = None
+        stage_node.stage = TextureStage("stage-" + str(sort))
+
+        # Set texture stage sort
+        stage_node.stage.sort = sort
+
+        texture = texture_slot.texture
+
+        # Check if the texture was already processed, and if so, return the
+        # cached result
+        if texture.name in self.textures_cache:
+            return self.textures_cache[texture.name]
+
+        # Check if the texture type is supported
+        if texture.type == "IMAGE":
+
+            # Extract the image
+            image = texture.image
+
+            stage_node.texture = self._create_texture_from_image(image)
+            stage_node.texture.default_sampler = stage_node.sampler
+
+        elif texture.type in ["BLEND", "CLOUDS", "DISTORTED_NOISE", "ENVIRONMENT_MAP", 
+            "MAGIC", "MARBLE", "MUSGRAVE", "NOISE", "OCEAN", "POINT_DENSITY",
+            "STUCCI", "VORONOI", "WOOD"]:
+            print("TODO: Handle generated image")
+            return None
+
+        else:
+            raise PBEExportException("Unsupported texture type for texture '" + texture.name + "': " + texture.type)
+
+        self.textures_cache[texture.name] = stage_node
+
+        return stage_node
+
     def _create_state_from_material(self, material):
         """ Creates a render state based on a material """
 
-        try:
-            material_name = material.name.encode('utf-8', 'replace')
-        except UnicodeDecodeError:
-            print("Error decoding material name")
-            material_name ="ERRROR"
+        # Check if we already created this material
+        if material.name in self.material_state_cache:
+            return self.material_state_cache[material.name]
 
-        if material_name in self.material_state_cache:
-            return self.material_state_cache[material_name]
+        # Create the render state
+        virtual_state = RenderState()
 
+        # Extract the material properties
         virtual_material = Material()
         virtual_material.diffuse = (
             material.diffuse_color[0] * material.diffuse_intensity, 
@@ -190,8 +387,29 @@ class PBESceneWriter:
             material.emit * material.diffuse_color[1] * material.diffuse_intensity,
             material.emit * material.diffuse_color[2] * material.diffuse_intensity,
             1.0)
-        virtual_state = RenderState(MaterialAttrib(virtual_material))
-        self.material_state_cache[material_name] = virtual_state
+
+        # Attach the material attribute to the render state
+        virtual_state.attributes.append(MaterialAttrib(virtual_material))
+
+        # Iterate over the texture slots and extract the stage nodes
+        stage_nodes = []
+        for idx, tex_slot in enumerate(material.texture_slots):
+            stage_node = self._create_texture_stage_node_from_texture_slot(tex_slot, sort=idx*10)
+            if stage_node:
+                stage_nodes.append(stage_node)
+
+        # Check if there is at least one texture, and if so, create a texture attrib
+        if len(stage_nodes) > 0:
+
+            texture_attrib = TextureAttrib()
+
+            # Attach the stage to the texture attrib
+            for stage in stage_nodes:
+                texture_attrib.on_stage_nodes.append(stage)
+
+            virtual_state.attributes.append(texture_attrib)
+
+        self.material_state_cache[material.name] = virtual_state
 
         return virtual_state
 
@@ -207,6 +425,10 @@ class PBESceneWriter:
         if max_possible_vtx_count >= 2**16 - 1:
             use_32_bit_indices = True
             print("Hint: using 32 bit indices for large geom")
+
+
+        # Check wheter the object has texture coordinates assigned
+        have_texcoords = uv_coordinates is not None
 
         # Create handles to the data, this makes accessing it faster
         vertices = mesh.vertices
@@ -233,7 +455,7 @@ class PBESceneWriter:
             is_smooth = poly.use_smooth
 
             # Iterate over the 3 vertices of that triangle
-            for vertex_index in poly.vertices:
+            for idx, vertex_index in enumerate(poly.vertices):
 
                 # If the vertex is already known, just write its index, but only
                 # if the polygon does use smooth shading, otherwise all vertices
@@ -262,6 +484,12 @@ class PBESceneWriter:
                         vertex_buffer.append(poly.normal[1])
                         vertex_buffer.append(poly.normal[2])
 
+                    # Add the texcoord
+                    if have_texcoords:
+                        uv = uv_coordinates[poly.loop_indices[idx]].uv
+                        vertex_buffer.append(uv[0])
+                        vertex_buffer.append(uv[1])
+
                     # Store the vertex index in the triangle data
                     index_buffer.append(num_vertices)
 
@@ -280,6 +508,9 @@ class PBESceneWriter:
 
         if use_32_bit_indices:
             index_format = self.gvd_formats['index32']
+
+        if have_texcoords:
+            vertex_format = self.gvd_formats['v3n3t2']
 
         # Create the vertex array data, to store the per-vertex data
         array_data = GeomVertexArrayData(vertex_format, GeomEnums.UH_static)

@@ -41,17 +41,33 @@ else:
 
 class PBEExportSettings(bpy.types.PropertyGroup):
     """ This class stores the exporter settings """
-    name =  bpy.props.StringProperty(
-            name="TestProp",
-            description="A test property",
-            default="Default value")
+
+    tex_mode =  bpy.props.EnumProperty(
+            name="Texture handling",
+            description="How to handle textures",
+            items=[
+                ("ABSOLUTE", "Absolute", "Store absolute paths to the textures"),
+                ("RELATIVE", "Relative", "Store relative paths to the textures"),
+                ("COPY", "Copy (Recommended)", "Copy the textures to a folder relative to the bam file"),
+                ("INCLUDE", "Include", "Include the textures in the bam file"),
+                ("KEEP", "Keep", "Use the same texture path settings that blender uses (advanced)"),
+            ],
+            default="ABSOLUTE")
+
+    tex_copy_path = bpy.props.StringProperty(
+            name="Texture copy path",
+            description="The relative path where to copy the textures to",
+            default="./tex/")
 
     def draw(self, layout):
         """ This function is called by the PBEExportOperator, whenever the export-
         screen is rendered. We should draw all available export properties here """
 
-        layout.row().label('Demo Property:')
-        layout.row().prop(self, 'name')
+        layout.row().prop(self, 'tex_mode')
+
+        if self.tex_mode == "COPY":
+            box = layout.box()
+            box.row().prop(self, 'tex_copy_path')
 
 
 class PBEExportOperator(bpy.types.Operator, ExportHelper):
