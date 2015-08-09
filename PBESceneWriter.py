@@ -26,6 +26,7 @@ class PBESceneWriter:
         self._stats_exported_geoms = 0
         self.material_state_cache = {}
         self.textures_cache = {}
+        self.images_cache = {}
 
     def set_filepath(self, filepath):
         """ Sets the filepath used to store the bam file. In future, the writer
@@ -73,11 +74,13 @@ class PBESceneWriter:
         print("Exported", format(self._stats_exported_vertices, ",d"), "Vertices and", format(self._stats_exported_tris, ",d"), "Triangles")
         print("Exported", self._stats_exported_objs, "Objects and", self._stats_exported_geoms, "Geoms")
         print("Total materials:", len(self.material_state_cache.keys()))
+        print("Total texture slots:", len(self.textures_cache.keys()))
+        print("Total images:", len(self.images_cache.keys()))
 
         raise PBEExportException("Not implemented yet")
 
 
-    def _group_mesh_faces_by_material(self, mesh, num_slots = 20):
+    def _group_mesh_faces_by_material(self, mesh, num_slots = 40):
         """ Iterates over all faces of the given mesh, grouping them by their
         material index """
 
@@ -99,8 +102,18 @@ class PBESceneWriter:
          pass
 
     def _handle_empty(self, obj):
-         """ Internal method to handle an empty object """
-         pass
+        """ Internal method to handle an empty object """
+
+        # Create the transform state based on the object
+        transformState = TransformState()
+        transformState.mat = obj.matrix_world
+
+        # Create a new panda node with the transform
+        virtual_node = PandaNode(obj.name)
+        virtual_node.transform = transformState
+
+        # Attach the node to the scene graph
+        self.virtual_model_root.add_child(virtual_node)
 
     def _handle_curve(self, obj):
          """ Internal method to handle a curve """
@@ -213,17 +226,24 @@ class PBESceneWriter:
 
         # Check if the target directory exists, and if not, create it
         target_dir = os.path.dirname(dest_filename)
+
         if not os.path.isdir(target_dir):
             os.makedirs(target_dir)
+
+
 
         # In case the file is found on disk, just copy it
         if os.path.isfile(old_filename):
 
             # If there is already a file at the location, delete that first
             if os.path.isfile(dest_filename):
+
+                # If the file source is the file target, just return
+                if os.stat(dest_filename) == os.stat(old_filename):
+                    return dest_filename
+
                 os.remove(dest_filename)
 
-            print("copy",old_filename,"to", dest_filename)
             shutil.copyfile(old_filename, dest_filename)
 
         # When its not on disk, try to use the image.save() function
@@ -241,9 +261,11 @@ class PBESceneWriter:
 
             # Finally try to save the image
             try:
-                copy.save_render(filepath=dest_filename)
+                copy.save()
             except Exception as msg:
                 raise PBEExportException("Error during image export: " + str(msg))
+            finally:
+                 bpy.data.images.remove(copy)
 
         return dest_filename
 
@@ -257,6 +279,9 @@ class PBESceneWriter:
 
     def _create_texture_from_image(self, image):
         """ Creates a texture object from a given image """
+
+        if image.name in self.images_cache:
+            return self.images_cache[image.name]
 
         mode = str(self.settings.tex_mode)
         texture = Texture(image.name)
@@ -303,14 +328,22 @@ class PBESceneWriter:
         elif mode == "KEEP":
             raise PBEExportException("Texture mode KEEP is not supported yet!")
 
+        self.images_cache[image.name] = texture
+
         return texture
 
     def _create_texture_stage_node_from_texture_slot(self, texture_slot, sort=0):
         """ Creates a panda texture object from a blender texture object """ 
 
+
         # Check if the slot is not empty and a texture is assigned
         if not texture_slot or not texture_slot.texture or texture_slot.texture.type == "NONE":
             return None
+
+        # Check if the texture slot was already processed, and if so, return the
+        # cached result
+        if texture_slot.name in self.textures_cache:
+            return self.textures_cache[texture_slot.name]
 
         # Check if the texture slot mode is supported
         if texture_slot.texture_coords != "UV":
@@ -321,17 +354,17 @@ class PBESceneWriter:
         stage_node = TextureAttrib.StageNode()
         stage_node.sampler = self._create_sampler_state_from_texture_slot(texture_slot)
         stage_node.texture = None
-        stage_node.stage = TextureStage("stage-" + str(sort))
+        stage_node.stage = TextureStage(texture_slot.name + "-" + str(sort))
+
+        # Store uv scale
+        stage_node._pbe_uv_transform = TransformState()
+        stage_node._pbe_uv_transform.scale = (texture_slot.scale[0], texture_slot.scale[1], texture_slot.scale[2])
 
         # Set texture stage sort
         stage_node.stage.sort = sort
 
         texture = texture_slot.texture
 
-        # Check if the texture was already processed, and if so, return the
-        # cached result
-        if texture.name in self.textures_cache:
-            return self.textures_cache[texture.name]
 
         # Check if the texture type is supported
         if texture.type == "IMAGE":
@@ -339,7 +372,11 @@ class PBESceneWriter:
             # Extract the image
             image = texture.image
 
-            stage_node.texture = self._create_texture_from_image(image)
+            try:
+                stage_node.texture = self._create_texture_from_image(image)
+            except Exception as msg:
+                print("Could not extract image:", msg)
+                return None
             stage_node.texture.default_sampler = stage_node.sampler
 
         elif texture.type in ["BLEND", "CLOUDS", "DISTORTED_NOISE", "ENVIRONMENT_MAP", 
@@ -351,7 +388,7 @@ class PBESceneWriter:
         else:
             raise PBEExportException("Unsupported texture type for texture '" + texture.name + "': " + texture.type)
 
-        self.textures_cache[texture.name] = stage_node
+        self.textures_cache[texture_slot.name] = stage_node
 
         return stage_node
 
@@ -403,11 +440,24 @@ class PBESceneWriter:
 
             texture_attrib = TextureAttrib()
 
+            has_any_transform = False
+            tex_mat_attrib = TexMatrixAttrib()
+
+
             # Attach the stage to the texture attrib
             for stage in stage_nodes:
                 texture_attrib.on_stage_nodes.append(stage)
+                tex_mat_attrib.add_stage(stage.stage, stage._pbe_uv_transform, 0)
+
+                if stage._pbe_uv_transform.scale != (1,1,1):
+                    has_any_transform = True
 
             virtual_state.attributes.append(texture_attrib)
+
+            if has_any_transform:
+                print("Apply tex mat attrib")
+                virtual_state.attributes.append(tex_mat_attrib)
+
 
         self.material_state_cache[material.name] = virtual_state
 
