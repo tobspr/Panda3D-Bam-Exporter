@@ -3,9 +3,9 @@ bl_info = {
     "name": "Panda3D Bam Exporter (PBE)",
     "description": "Import / Export Panda3D bam files",
     "author": "tobspr",
-    "version": (1, 0, 0),
-    "blender": (2, 72, 2),
-    "location": "File > Import & File > Export",
+    "version": (1, 0, 1),
+    "blender": (2, 76, 0),
+    "location": "File > Export > Export to .bam",
     "warning": "",
     "wiki_url": "http://tobspr.me/bam-export/wiki",
     "category": "Import-Export",
@@ -78,10 +78,10 @@ class PBEExportOperator(bpy.types.Operator, ExportHelper):
     bl_label = "Export to Panda3D BAM"
 
     filename_ext = ".bam"
-    filter_glob = StringProperty(
-            default="*.bam",
-            options={'HIDDEN'},
-            )
+    # filter_glob = StringProperty(
+    #         default="*.bam",
+    #         )
+    filepath = StringProperty()
 
     def execute(self, context):
         """ This function is called when the operator is executed. It starts the
@@ -112,8 +112,7 @@ class PBEExportOperator(bpy.types.Operator, ExportHelper):
             self.report({'ERROR'}, err.message)
             return {'CANCELLED'}
 
-        self.report({'ERROR'}, "Not implemented yet")
-        return {'CANCELLED'}
+        return {'FINISHED'}
         
     def draw(self, context):
         """ This function is called when the export-screen is drawn. We draw
@@ -124,8 +123,6 @@ def PBEExportFuncCallback(self, context):
     self.layout.operator(PBEExportOperator.bl_idname, text="Panda3D (.bam)")
 
 
-
-
 def register():
     print("Registering export properties")
     bpy.utils.register_class(PBEExportSettings)
@@ -133,8 +130,6 @@ def register():
     bpy.types.INFO_MT_file_export.append(PBEExportFuncCallback)
     bpy.types.Scene.pbe = PointerProperty(type=PBEExportSettings)
 
-    # Reload all internal modules
-    # imp.reload(PBEExportException)
 
 def unregister():
     print("Unregistering export properties")

@@ -77,7 +77,7 @@ class PBESceneWriter:
         print("Total texture slots:", len(self.textures_cache.keys()))
         print("Total images:", len(self.images_cache.keys()))
 
-        raise PBEExportException("Not implemented yet")
+        # raise PBEExportException("Not implemented yet")
 
 
     def _group_mesh_faces_by_material(self, mesh, num_slots = 40):
