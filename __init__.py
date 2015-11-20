@@ -31,11 +31,13 @@ if "PBESceneWriter" not in locals():
     # Now import the required libs
     import PBEExportException
     import PBESceneWriter
+    import PBEPBS
 
 else:
     # If we already imported the libs, just reload them (but don't modify the path again)
     importlib.reload(PBEExportException)
     importlib.reload(PBESceneWriter)
+    importlib.reload(PBEPBS)
 
 
 
@@ -59,6 +61,15 @@ class PBEExportSettings(bpy.types.PropertyGroup):
             description="The relative path where to copy the textures to",
             default="./tex/")
 
+    use_pbs = bpy.props.BoolProperty(
+            name="Use PBS addon",
+            description="Whether to use the Physically Based Shading addon. This "
+                        "stores the physically based properties of the material in "
+                        "the diffuse and specular components to be used in the application "
+                        "later on",
+            default=True
+        )
+
     def draw(self, layout):
         """ This function is called by the PBEExportOperator, whenever the export-
         screen is rendered. We should draw all available export properties here """
@@ -68,6 +79,8 @@ class PBEExportSettings(bpy.types.PropertyGroup):
         if self.tex_mode == "COPY":
             box = layout.box()
             box.row().prop(self, 'tex_copy_path')
+
+        layout.row().prop(self, 'use_pbs')
 
 
 class PBEExportOperator(bpy.types.Operator, ExportHelper):
@@ -112,8 +125,7 @@ class PBEExportOperator(bpy.types.Operator, ExportHelper):
             self.report({'ERROR'}, err.message)
             return {'CANCELLED'}
 
-        self.report({'ERROR'}, "Not implemented yet")
-        return {'CANCELLED'}
+        return {'FINISHED'}
         
     def draw(self, context):
         """ This function is called when the export-screen is drawn. We draw
@@ -125,13 +137,13 @@ def PBEExportFuncCallback(self, context):
 
 
 
-
 def register():
     print("Registering export properties")
     bpy.utils.register_class(PBEExportSettings)
     bpy.utils.register_class(PBEExportOperator)
     bpy.types.INFO_MT_file_export.append(PBEExportFuncCallback)
     bpy.types.Scene.pbe = PointerProperty(type=PBEExportSettings)
+    bpy.types.Material.pbepbs = PointerProperty(type=PBEPBS.PBEPBSMatProps)
 
     # Reload all internal modules
     # imp.reload(PBEExportException)
@@ -140,5 +152,7 @@ def unregister():
     print("Unregistering export properties")
     bpy.utils.unregister_class(PBEExportSettings)
     bpy.utils.unregister_class(PBEExportOperator)
+    bpy.utils.unregister_module(PBEPBS)
     bpy.types.INFO_MT_file_export.remove(PBEExportFuncCallback)
     del bpy.types.Scene.pbe
+    del bpy.types.Material.pbepbs

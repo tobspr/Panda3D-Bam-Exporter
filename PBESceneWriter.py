@@ -77,8 +77,6 @@ class PBESceneWriter:
         print("Total texture slots:", len(self.textures_cache.keys()))
         print("Total images:", len(self.images_cache.keys()))
 
-        raise PBEExportException("Not implemented yet")
-
 
     def _group_mesh_faces_by_material(self, mesh, num_slots = 40):
         """ Iterates over all faces of the given mesh, grouping them by their
@@ -123,6 +121,14 @@ class PBESceneWriter:
         """ Internal method to handle a font """
         pass
 
+    def _handle_lattice(self, obj):
+        """ Internal method to handle a lattice """
+        pass
+
+    def _handle_armature(self, obj):
+        """ Internal method to handle a lattice """
+        pass
+
     def _handle_object(self, obj):
         """ Internal method to process an object during the export process """
         print("Export object:", obj.name)
@@ -141,6 +147,10 @@ class PBESceneWriter:
             self._handle_curve(obj)
         elif obj.type == "FONT":
             self._handle_font(obj)
+        elif obj.type == "LATTICE":
+            self._handle_lattice(obj)
+        elif obj.type == "ARMATURE":
+            self._handle_armature(obj)
         else:
             raise PBEExportException("Object " + obj.name + " has a non implemented type: '" + obj.type + "'")
 
@@ -362,6 +372,7 @@ class PBESceneWriter:
 
         # Set texture stage sort
         stage_node.stage.sort = sort
+        stage_node.stage.priority = sort
 
         texture = texture_slot.texture
 
@@ -399,31 +410,46 @@ class PBESceneWriter:
         if material.name in self.material_state_cache:
             return self.material_state_cache[material.name]
 
-        # Create the render state
+        # Create the render and material state
         virtual_state = RenderState()
-
-        # Extract the material properties
         virtual_material = Material()
-        virtual_material.diffuse = (
-            material.diffuse_color[0] * material.diffuse_intensity, 
-            material.diffuse_color[1] * material.diffuse_intensity,
-            material.diffuse_color[2] * material.diffuse_intensity,
-            material.alpha)
-        virtual_material.ambient = (
-            material.ambient,
-            material.ambient,
-            material.ambient,
-            1.0)
-        virtual_material.specular = (
-            material.specular_color[0] * material.specular_intensity,
-            material.specular_color[1] * material.specular_intensity,
-            material.specular_color[2] * material.specular_intensity,
-            material.specular_alpha)
-        virtual_material.emissive = (
-            material.emit * material.diffuse_color[0] * material.diffuse_intensity,
-            material.emit * material.diffuse_color[1] * material.diffuse_intensity,
-            material.emit * material.diffuse_color[2] * material.diffuse_intensity,
-            1.0)
+
+        # Extract the material properties:
+        # In case we use PBS, encode its properties in a special way
+
+        if not self.settings.use_pbs:
+            virtual_material.diffuse = (
+                material.diffuse_color[0] * material.diffuse_intensity, 
+                material.diffuse_color[1] * material.diffuse_intensity,
+                material.diffuse_color[2] * material.diffuse_intensity,
+                material.alpha)
+            virtual_material.ambient = (
+                material.ambient,
+                material.ambient,
+                material.ambient,
+                1.0)
+            virtual_material.specular = (
+                material.specular_color[0] * material.specular_intensity,
+                material.specular_color[1] * material.specular_intensity,
+                material.specular_color[2] * material.specular_intensity,
+                material.specular_alpha)
+            virtual_material.emissive = (
+                material.emit * material.diffuse_color[0] * material.diffuse_intensity,
+                material.emit * material.diffuse_color[1] * material.diffuse_intensity,
+                material.emit * material.diffuse_color[2] * material.diffuse_intensity,
+                1.0)
+        else:
+            virtual_material.diffuse = (
+                material.pbepbs.basecolor[0],
+                material.pbepbs.basecolor[1],
+                material.pbepbs.basecolor[2], 1)
+            virtual_material.specular = (
+                material.pbepbs.specular,
+                material.pbepbs.metallic,
+                material.pbepbs.roughness,
+                material.pbepbs.bumpmap_strength)
+            virtual_material.ambient = (0, 0, 0, 1)
+            virtual_material.emissive = (0, 0, 0, 1)
 
         # Attach the material attribute to the render state
         virtual_state.attributes.append(MaterialAttrib(virtual_material))
@@ -458,6 +484,7 @@ class PBESceneWriter:
                 print("Apply tex mat attrib")
                 virtual_state.attributes.append(tex_mat_attrib)
 
+            print("Textures: ", len(stage_nodes), len(texture_attrib.on_stage_nodes))
 
         self.material_state_cache[material.name] = virtual_state
 
@@ -604,6 +631,8 @@ class PBESceneWriter:
         # Create the transform state
         transformState = TransformState()
         transformState.mat = obj.matrix_world
+
+
 
 
         # Convert the object to a mesh, so we can read the polygons
