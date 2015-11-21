@@ -77,7 +77,6 @@ class PBESceneWriter:
         print("Total texture slots:", len(self.textures_cache.keys()))
         print("Total images:", len(self.images_cache.keys()))
 
-
     def _group_mesh_faces_by_material(self, mesh, num_slots = 40):
         """ Iterates over all faces of the given mesh, grouping them by their
         material index """
