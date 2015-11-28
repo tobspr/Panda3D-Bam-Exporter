@@ -1,6 +1,7 @@
 
 import bpy
-from os.path import join, dirname
+
+from os.path import join, dirname, abspath
 
 
 
@@ -17,18 +18,26 @@ class PBEPBSMaterial(bpy.types.Panel):
 
     def draw(self, context):
 
-        row = self.layout.row()
-        row.operator("pbepbs.set_default_diffuse")
-        row.operator("pbepbs.set_default_metallic")
+        self.layout.label("PBS Material Properties:")
 
-        self.layout.row().prop(context.material.pbepbs, "basecolor")
+        box = self.layout.box()
+        box.row().prop(context.material.pbepbs, "basecolor")
 
         # row = self.layout.row()
-        self.layout.row().prop(context.material.pbepbs, "roughness")
-        self.layout.row().prop(context.material.pbepbs, "metallic")
-        self.layout.row().prop(context.material.pbepbs, "specular")
+        box.row().prop(context.material.pbepbs, "roughness")
+        box.row().prop(context.material.pbepbs, "metallic")
+        box.row().prop(context.material.pbepbs, "specular")
 
-        self.layout.row().prop(context.material.pbepbs, "bumpmap_strength")
+        box.row().prop(context.material.pbepbs, "bumpmap_strength")
+
+        self.layout.separator()
+
+        self.layout.label("Material options:")
+
+        self.layout.row().operator("pbepbs.set_default_diffuse")
+        self.layout.row().operator("pbepbs.set_default_metallic")
+        self.layout.row().operator("pbepbs.set_default_textures")
+
 
     def draw_header(self, context):
         self.layout.label(text="", icon="MATERIAL")
@@ -65,7 +74,7 @@ class PBEPBSMatProps(bpy.types.PropertyGroup):
         description="Base color of the material. In case of non-metallic materials, "
                     "this denotes the diffuse color. In case of metallic materials, "
                     "this denotes the specular color",
-        subtype="COLOR",
+        subtype="COLOR_GAMMA",
         default=[1.0, 1.0, 1.0],
         min=0.0,
         max=1.0)
@@ -78,10 +87,61 @@ class PBEPBSMatProps(bpy.types.PropertyGroup):
             default=0.0, min=0.0, max=1.0)
 
 
+class PBEOperatorSetDefaultTextures(bpy.types.Operator):
+    """ Operator to fill the empty texture slots on a material with default textures """
+
+    bl_idname = "pbepbs.set_default_textures"
+    bl_label = "Fill default PBS textures"
+
+    def execute(self, context):
+
+        if not hasattr(context, "material"):
+            return {'CANCELLED'}
+        print("Executing default texture operator")
+        material = context.material
+
+        for index, slot_name in enumerate(["BaseColor", "Normal", "Specular", "Roughness"]):
+            slot = material.texture_slots[index]
+            # print("SLOT = ", slot)
+            if slot is not None and slot.texture is not None:
+                print("Skipping used slot #", index)
+                continue
+
+            slot = material.texture_slots.create(index)
+            texname = "Empty" + slot_name 
+            default_pth = join(dirname(__file__), "res/" + texname + ".png")
+                
+            image = None
+            for img in bpy.data.images:
+                if img.filepath == default_pth:
+                    print("FOUND IMG")
+                    image = img
+                    break
+            else:
+                print("LOAD IMG")
+                image = bpy.ops.image.open(filepath=default_pth, relative_path=False)
+
+            texture = None
+            for tex in bpy.data.textures:
+                if tex.name == texname:
+                    print("FOUND TEX")
+                    texture = tex
+                    break
+            else:
+                texture = bpy.data.textures.new(texname, type="IMAGE")
+
+            texture.image = image
+
+            slot.texture_coords = "UV"
+            slot.texture = texture
+
+        return {'FINISHED'}
+
+
 class PBEOperatorDefaultDiffuse(bpy.types.Operator):
     """ Operator to set the default diffuse properties on a material """
     bl_idname = "pbepbs.set_default_diffuse"
-    bl_label = "Set default diffuse material"
+    bl_label = "Set default PBS diffuse material"
  
     def execute(self, context):
         context.material.pbepbs.basecolor = [1, 1, 1]
@@ -89,13 +149,13 @@ class PBEOperatorDefaultDiffuse(bpy.types.Operator):
         context.material.pbepbs.metallic = 0.0
         context.material.pbepbs.roughness = 0.3
         context.material.pbepbs.bumpmap_strength = 0.0
-        return{'FINISHED'}
+        return {'FINISHED'}
 
 
 class PBEOperatorDefaultMetallic(bpy.types.Operator):
     """ Operator to set the default metallic properties on a material """
     bl_idname = "pbepbs.set_default_metallic"
-    bl_label = "Set default metallic material"
+    bl_label = "Set default PBS metallic material"
  
     def execute(self, context):
         context.material.pbepbs.basecolor = [1, 1, 1]
@@ -103,6 +163,6 @@ class PBEOperatorDefaultMetallic(bpy.types.Operator):
         context.material.pbepbs.metallic = 1.0
         context.material.pbepbs.roughness = 0.4
         context.material.pbepbs.bumpmap_strength = 0.0
-        return{'FINISHED'}
+        return {'FINISHED'}
 
 bpy.utils.register_module(__name__)
