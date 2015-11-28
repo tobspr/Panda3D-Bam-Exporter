@@ -119,7 +119,9 @@ class PBEOperatorSetDefaultTextures(bpy.types.Operator):
                     break
             else:
                 print("LOAD IMG")
-                image = bpy.ops.image.open(filepath=default_pth, relative_path=False)
+                bpy.ops.image.open(filepath=default_pth, relative_path=False)
+                image = bpy.data.images[texname + ".png"]
+                print("IMAGE=", image)
 
             texture = None
             for tex in bpy.data.textures:
@@ -128,8 +130,10 @@ class PBEOperatorSetDefaultTextures(bpy.types.Operator):
                     texture = tex
                     break
             else:
+                print("LOAD TEX")
                 texture = bpy.data.textures.new(texname, type="IMAGE")
 
+            print("Setting image:", image)
             texture.image = image
 
             slot.texture_coords = "UV"

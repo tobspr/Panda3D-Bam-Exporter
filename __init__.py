@@ -54,7 +54,7 @@ class PBEExportSettings(bpy.types.PropertyGroup):
                 ("INCLUDE", "Include", "Include the textures in the bam file"),
                 ("KEEP", "Keep", "Use the same texture path settings that blender uses (advanced)"),
             ],
-            default="ABSOLUTE")
+            default="COPY")
 
     tex_copy_path = bpy.props.StringProperty(
             name="Texture copy path",

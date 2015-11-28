@@ -239,8 +239,6 @@ class PBESceneWriter:
         if not os.path.isdir(target_dir):
             os.makedirs(target_dir)
 
-
-
         # In case the file is found on disk, just copy it
         if os.path.isfile(old_filename):
 
@@ -371,10 +369,10 @@ class PBESceneWriter:
 
         # Set texture stage sort
         stage_node.stage.sort = sort
-        stage_node.stage.priority = sort
+        stage_node.stage.default = False
+        stage_node.stage.priority = 0
 
         texture = texture_slot.texture
-
 
         # Check if the texture type is supported
         if texture.type == "IMAGE":
@@ -468,7 +466,6 @@ class PBESceneWriter:
             has_any_transform = False
             tex_mat_attrib = TexMatrixAttrib()
 
-
             # Attach the stage to the texture attrib
             for stage in stage_nodes:
                 texture_attrib.on_stage_nodes.append(stage)
@@ -480,7 +477,6 @@ class PBESceneWriter:
             virtual_state.attributes.append(texture_attrib)
 
             if has_any_transform:
-                print("Apply tex mat attrib")
                 virtual_state.attributes.append(tex_mat_attrib)
 
             print("Textures: ", len(stage_nodes), len(texture_attrib.on_stage_nodes))
