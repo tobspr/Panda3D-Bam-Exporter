@@ -439,12 +439,12 @@ class PBESceneWriter:
             virtual_material.diffuse = (
                 material.pbepbs.basecolor[0],
                 material.pbepbs.basecolor[1],
-                material.pbepbs.basecolor[2], 1)
+                material.pbepbs.basecolor[2], material.pbepbs.bumpmap_strength)
             virtual_material.specular = (
                 material.pbepbs.specular,
                 material.pbepbs.metallic,
                 material.pbepbs.roughness,
-                material.pbepbs.bumpmap_strength)
+                1)
             virtual_material.ambient = (0, 0, 0, 1)
             virtual_material.emissive = (0, 0, 0, 1)
 
