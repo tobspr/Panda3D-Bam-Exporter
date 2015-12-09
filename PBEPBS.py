@@ -74,7 +74,7 @@ class PBEPBSMatProps(bpy.types.PropertyGroup):
         description="Base color of the material. In case of non-metallic materials, "
                     "this denotes the diffuse color. In case of metallic materials, "
                     "this denotes the specular color",
-        subtype="COLOR_GAMMA",
+        subtype="COLOR",
         default=[1.0, 1.0, 1.0],
         min=0.0,
         max=1.0)
