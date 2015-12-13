@@ -9,7 +9,11 @@ is an exporter for the `.egg` format), mainly speed and smaller exported files.
 
 ### Installation
 
-Just click `Download ZIP`, and install that zip from the Blender user preferences.
+You need to clone the repositority, since it uses a submodule which will not be 
+included when you use the `Download ZIP` button.
+
+After cloning, make sure to execute `git submodule init` and then `git submodule update`.
+
 
 
 ### Usage
