@@ -6,12 +6,12 @@ import time
 import shutil
 from array import array
 
-from PBEExportException import PBEExportException
+from ExportException import ExportException
 
 from pybamwriter.panda_types import *
 from pybamwriter.bam_writer import BamWriter
 
-class PBESceneWriter:
+class SceneWriter:
 
     """ This class handles the conversion from the blender scene graph to the
     virtual scene graph, to be able to export that converted scene graph to a 
@@ -151,7 +151,7 @@ class PBESceneWriter:
         elif obj.type == "ARMATURE":
             self._handle_armature(obj)
         else:
-            raise PBEExportException("Object " + obj.name + " has a non implemented type: '" + obj.type + "'")
+            raise ExportException("Object " + obj.name + " has a non implemented type: '" + obj.type + "'")
 
     def _create_default_array_formats(self):
         """ Creates the default GeomVertexArrayFormats, so we do not have to 
@@ -270,7 +270,7 @@ class PBESceneWriter:
             try:
                 copy.save()
             except Exception as msg:
-                raise PBEExportException("Error during image export: " + str(msg))
+                raise ExportException("Error during image export: " + str(msg))
             finally:
                  bpy.data.images.remove(copy)
 
@@ -331,9 +331,9 @@ class PBESceneWriter:
             texture.filename = self._convert_to_panda_filepath(rel_filename)
 
         elif mode == "INCLUDE":
-            raise PBEExportException("Texture mode INCLUDE is not supported yet!")
+            raise ExportException("Texture mode INCLUDE is not supported yet!")
         elif mode == "KEEP":
-            raise PBEExportException("Texture mode KEEP is not supported yet!")
+            raise ExportException("Texture mode KEEP is not supported yet!")
 
         self.images_cache[image.name] = texture
 
@@ -354,7 +354,7 @@ class PBESceneWriter:
 
         # Check if the texture slot mode is supported
         if texture_slot.texture_coords != "UV":
-            # raise PBEExportException("Unsupported texture coordinate mode for slot '" + texture_slot.name + "': " + texture_slot.texture_coords)
+            # raise ExportException("Unsupported texture coordinate mode for slot '" + texture_slot.name + "': " + texture_slot.texture_coords)
             return None
 
         # Create sampler state
@@ -394,7 +394,7 @@ class PBESceneWriter:
             return None
 
         else:
-            raise PBEExportException("Unsupported texture type for texture '" + texture.name + "': " + texture.type)
+            raise ExportException("Unsupported texture type for texture '" + texture.name + "': " + texture.type)
 
         self.textures_cache[texture_slot.name] = stage_node
 

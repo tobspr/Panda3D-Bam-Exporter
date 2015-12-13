@@ -4,8 +4,7 @@ import bpy
 from os.path import join, dirname, abspath
 
 
-
-class PBEPBSMaterial(bpy.types.Panel):
+class PBSMaterial(bpy.types.Panel):
 
     """ This is a panel to display the PBS properties of the currently
     selected material """
@@ -44,7 +43,7 @@ class PBEPBSMaterial(bpy.types.Panel):
 
 
 
-class PBEPBSMatProps(bpy.types.PropertyGroup):
+class PBSMatProps(bpy.types.PropertyGroup):
 
     """ This is the property group which stores the PBS properties of each
     material """
@@ -79,7 +78,6 @@ class PBEPBSMatProps(bpy.types.PropertyGroup):
         min=0.0,
         max=1.0)
 
-
     bumpmap_strength = bpy.props.FloatProperty(
             name="Bump-Map Strength",
             description="Strength of the Bump Map",
@@ -87,7 +85,7 @@ class PBEPBSMatProps(bpy.types.PropertyGroup):
             default=0.0, min=0.0, max=1.0)
 
 
-class PBEOperatorSetDefaultTextures(bpy.types.Operator):
+class OperatorSetDefaultTextures(bpy.types.Operator):
     """ Operator to fill the empty texture slots on a material with default textures """
 
     bl_idname = "pbepbs.set_default_textures"
@@ -109,7 +107,7 @@ class PBEOperatorSetDefaultTextures(bpy.types.Operator):
 
             slot = material.texture_slots.create(index)
             texname = "Empty" + slot_name 
-            default_pth = join(dirname(__file__), "res/" + texname + ".png")
+            default_pth = join(dirname(__file__), "../res/" + texname + ".png")
                 
             image = None
             for img in bpy.data.images:
@@ -142,7 +140,7 @@ class PBEOperatorSetDefaultTextures(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class PBEOperatorDefaultDiffuse(bpy.types.Operator):
+class OperatorDefaultDiffuse(bpy.types.Operator):
     """ Operator to set the default diffuse properties on a material """
     bl_idname = "pbepbs.set_default_diffuse"
     bl_label = "Set default PBS diffuse material"
@@ -156,7 +154,7 @@ class PBEOperatorDefaultDiffuse(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class PBEOperatorDefaultMetallic(bpy.types.Operator):
+class OperatorDefaultMetallic(bpy.types.Operator):
     """ Operator to set the default metallic properties on a material """
     bl_idname = "pbepbs.set_default_metallic"
     bl_label = "Set default PBS metallic material"
@@ -169,4 +167,11 @@ class PBEOperatorDefaultMetallic(bpy.types.Operator):
         context.material.pbepbs.bumpmap_strength = 0.0
         return {'FINISHED'}
 
-bpy.utils.register_module(__name__)
+
+def register():
+    bpy.utils.register_module(__name__)
+    bpy.types.Material.pbepbs = bpy.props.PointerProperty(type=PBSMatProps)
+
+def unregister():
+    del bpy.types.Material.pbepbs
+    bpy.utils.unregister_module(__name__)
