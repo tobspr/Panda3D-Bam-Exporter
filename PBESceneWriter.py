@@ -700,5 +700,5 @@ class PBESceneWriter:
         # Finally attach the geom node to the model root
         self.virtual_model_root.add_child(virtual_geom_node)
 
-        # TODO: Delete mesh
-        # mesh.delete() or sth like that.
+        bpy.data.meshes.remove(mesh)
+
