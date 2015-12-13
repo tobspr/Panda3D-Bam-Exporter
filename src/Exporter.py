@@ -5,6 +5,7 @@ from bpy_extras.io_utils import ExportHelper
 from SceneWriter import SceneWriter
 from ExportException import ExportException
 
+
 class ExportSettings(bpy.types.PropertyGroup):
     """ This class stores the exporter settings """
 
@@ -102,11 +103,13 @@ def PBEExportFuncCallback(self, context):
 # Register the module
 
 def register():
-    bpy.utils.register_module(__name__)
+    bpy.utils.register_class(ExportSettings)
+    bpy.utils.register_class(ExportOperator)
     bpy.types.INFO_MT_file_export.append(PBEExportFuncCallback)
     bpy.types.Scene.pbe = bpy.props.PointerProperty(type=ExportSettings)
 
 def unregister():
     del bpy.types.Scene.pbe
+    bpy.utils.unregister_class(ExportSettings)
+    bpy.utils.unregister_class(ExportOperator)
     bpy.types.INFO_MT_file_export.remove(PBEExportFuncCallback)
-    bpy.utils.unregister_module(__name__)

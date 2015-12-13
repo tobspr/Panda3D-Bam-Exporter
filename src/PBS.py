@@ -17,10 +17,16 @@ class PBSMaterial(bpy.types.Panel):
 
     def draw(self, context):
 
+        if not hasattr(context.material, "pbepbs"):
+            self.layout.label("No PBS datablock")
+            return
+
         self.layout.label("PBS Material Properties:")
 
         box = self.layout.box()
         box.row().prop(context.material.pbepbs, "basecolor")
+
+
 
         # row = self.layout.row()
         box.row().prop(context.material.pbepbs, "roughness")
@@ -112,11 +118,11 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
             image = None
             for img in bpy.data.images:
                 if img.filepath == default_pth:
-                    print("FOUND IMG")
+                    # print("FOUND IMG")
                     image = img
                     break
             else:
-                print("LOAD IMG")
+                # print("LOAD IMG")
                 bpy.ops.image.open(filepath=default_pth, relative_path=False)
                 image = bpy.data.images[texname + ".png"]
                 print("IMAGE=", image)
@@ -124,11 +130,11 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
             texture = None
             for tex in bpy.data.textures:
                 if tex.name == texname:
-                    print("FOUND TEX")
+                    # print("FOUND TEX")
                     texture = tex
                     break
             else:
-                print("LOAD TEX")
+                # print("LOAD TEX")
                 texture = bpy.data.textures.new(texname, type="IMAGE")
 
             print("Setting image:", image)
@@ -169,9 +175,20 @@ class OperatorDefaultMetallic(bpy.types.Operator):
 
 
 def register():
-    bpy.utils.register_module(__name__)
+    bpy.utils.register_class(OperatorDefaultDiffuse)
+    bpy.utils.register_class(OperatorDefaultMetallic)
+    bpy.utils.register_class(OperatorSetDefaultTextures)
+    bpy.utils.register_class(PBSMatProps)
+    bpy.utils.register_class(PBSMaterial)
+
     bpy.types.Material.pbepbs = bpy.props.PointerProperty(type=PBSMatProps)
 
 def unregister():
     del bpy.types.Material.pbepbs
-    bpy.utils.unregister_module(__name__)
+    
+    bpy.utils.unregister_class(OperatorDefaultDiffuse)
+    bpy.utils.unregister_class(OperatorDefaultMetallic)
+    bpy.utils.unregister_class(OperatorSetDefaultTextures)
+    bpy.utils.unregister_class(PBSMatProps)
+    bpy.utils.unregister_class(PBSMaterial)
+

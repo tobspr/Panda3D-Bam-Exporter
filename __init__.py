@@ -15,7 +15,8 @@ bl_info = {
 import os
 import sys
 import bpy
-# import importlib
+import importlib
+from types import ModuleType
 # from bpy.props import *
 
 
@@ -42,31 +43,36 @@ plugin_dir = os.path.dirname(os.path.abspath(__file__))
 source_dir = os.path.join(plugin_dir, "src")
 sys.path.insert(0, plugin_dir)
 sys.path.insert(0, source_dir)
-loaded_modules = []
+
+pbe_loaded_module_list = []
+
+def unload_modules():
+    """ Unregisters all loaded modules """
+    global pbe_loaded_module_list
+    for module_handle in pbe_loaded_module_list:
+        print("Unregistering module", module_handle.__name__)
+        module_handle.unregister()
 
 def register():
-    global loaded_modules
-    # print("Registering export properties")
-    # bpy.utils.register_class(PBEExportSettings)
-    # bpy.utils.register_class(PBEExportOperator)
-    # bpy.types.INFO_MT_file_export.append(PBEExportFuncCallback)
-    # bpy.types.Scene.pbe = PointerProperty(type=PBEExportSettings)
-    # bpy.types.Material.pbepbs = PointerProperty(type=PBEPBS.PBEPBSMatProps)
-    # pass
+    global pbe_loaded_module_list
+    unload_modules()
 
-    modules = bpy.utils.modules_from_path(source_dir, set("__init__"))
-    for module in modules:
-        if hasattr(module, "register"):
-            module.register()
-            loaded_modules.append(module)
+    # Load modules
+
+    importlib.invalidate_caches()
+
+    exporter = __import__("Exporter")
+    pbs = __import__("PBS")
+
+    exporter = importlib.reload(exporter)
+    pbs = importlib.reload(pbs)
+
+    pbe_loaded_module_list = [exporter, pbs]
+
+    for handle in pbe_loaded_module_list:
+        print("Registering", handle.__name__)
+        handle.register()
 
 def unregister():
-    # print("Unregistering export properties")
-    # bpy.utils.unregister_class(PBEExportSettings)
-    # bpy.utils.unregister_class(PBEExportOperator)
-    # bpy.utils.unregister_module(PBEPBS)
-    # bpy.types.INFO_MT_file_export.remove(PBEExportFuncCallback)
-    # del bpy.types.Scene.pbe
-    # del bpy.types.Material.pbepbs
-    for module in loaded_modules:
-        module.unregister()
+    global pbe_loaded_module_list
+    unload_modules()
