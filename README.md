@@ -27,14 +27,8 @@ in the lower left.
 **TODO:** Write wiki entry about export options.
 
 
-### Whats working
-
-- Mesh export
-- Modifiers
-
 ### Whats not working (yet)
 
-- Particle Systems
 - Animations
 - Bones & Deforms
 
