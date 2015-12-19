@@ -75,14 +75,37 @@ class TextureWriter(object):
     def _create_sampler_state_from_texture_slot(self, texture_slot):
         """ Creates a sampler state from a given texture slot """
         state = SamplerState()
-        # TODO: Implement me
         
-        state.wrap_u = SamplerState.WM_repeat
-        state.wrap_v = SamplerState.WM_repeat
-        state.wrap_w = SamplerState.WM_repeat
-        state.minfilter = SamplerState.FT_linear_mipmap_linear
-        state.magfilter = SamplerState.FT_linear
-        state.anisotropic_degree = 4
+        tex_handle = texture_slot.texture
+        if tex_handle:            
+            
+            # Process texture settings
+
+            # Mipmapping
+            if tex_handle.use_mipmap:
+                state.minfilter = SamplerState.FT_linear_mipmap_linear
+            else:
+                state.minfilter = SamplerState.FT_linear
+            state.magfilter = SamplerState.FT_linear
+
+            # Texture wrap modes
+            wrap_modes = {
+                "EXTEND": SamplerState.WM_clamp,
+                "CLIP": SamplerState.WM_border_color,
+                "CLIP_CUBE": SamplerState.WM_border_color,
+                "REPEAT": SamplerState.WM_repeat,
+                "CHECKER": SamplerState.WM_repeat
+            }
+
+            if tex_handle.extension in wrap_modes:
+                wrap_mode = wrap_modes[tex_handle.extension]
+                state.wrap_u, state.wrap_v, state.wrap_w = [wrap_mode] * 3
+            else:
+                print("Unkown texture extension:", tex_handle.extension)
+
+            # Improve texture sharpness
+            state.anisotropic_degree = 8
+
         return state
 
     def _create_texture_from_image(self, image):

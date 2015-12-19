@@ -22,6 +22,7 @@ class SceneWriter:
         self._stats_exported_tris = 0
         self._stats_exported_objs = 0
         self._stats_exported_geoms = 0
+        self._stats_duplicated_vertices = 0
         self.material_state_cache = {}
         self.texture_writer = TextureWriter(self)
         self.geometry_writer = GeometryWriter(self)
@@ -66,14 +67,19 @@ class SceneWriter:
         writer.close()
 
         end_time = time.time()
-        duration = round(end_time - start_time, 2)
+        duration = round(end_time - start_time, 4)
 
+        print("-" * 79)
         print("Export finished in", duration, "seconds.")
         print("Exported", format(self._stats_exported_vertices, ",d"), "Vertices and", format(self._stats_exported_tris, ",d"), "Triangles")
         print("Exported", self._stats_exported_objs, "Objects and", self._stats_exported_geoms, "Geoms")
-        print("Total materials:", len(self.material_state_cache.keys()))
-        print("Total texture slots:", len(self.texture_writer.textures_cache.keys()))
-        print("Total images:", len(self.texture_writer.images_cache.keys()))
+
+        if self._stats_duplicated_vertices:
+            print("Had to duplicate", format(self._stats_duplicated_vertices, ",d"), "Vertices due to different texture coordinates.")
+        
+        print("Exported", len(self.material_state_cache.keys()), "materials")
+        print("Exported", len(self.texture_writer.textures_cache.keys()), "texture slots, using", len(self.texture_writer.images_cache.keys()), "images")
+        print("-" * 79)
 
     def _handle_camera(self, obj):
         """ Internal method to handle a camera """
@@ -115,7 +121,7 @@ class SceneWriter:
 
     def _handle_object(self, obj):
         """ Internal method to process an object during the export process """
-        print("Export object:", obj.name)
+        print("Exporting object:", obj.name)
 
         self._stats_exported_objs += 1
 

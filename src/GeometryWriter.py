@@ -95,6 +95,7 @@ class GeometryWriter:
         # Store the number of written triangles and vertices
         num_triangles = 0
         num_vertices = 0
+        num_duplicated = 0
 
         # Create the buffers to store the data inside
         if use_32_bit_indices:
@@ -105,7 +106,8 @@ class GeometryWriter:
         vertex_buffer = array('f')
 
         # Store the location of each mesh vertex 
-        vertex_mappings = [-1 for i in range(len(vertices))] 
+        vertex_mappings = [-1 for i in range(len(vertices))]
+        vertex_uvs = [0.0 for i in range(len(vertices))]
 
         # Iterate over all triangles
         for poly in polygons:
@@ -120,42 +122,60 @@ class GeometryWriter:
                 # if the polygon does use smooth shading, otherwise all vertices
                 # are duplicated anyway.
                 if is_smooth and vertex_mappings[vertex_index] >= 0:
-                    index_buffer.append(vertex_mappings[vertex_index])
+
+                    # Store wheter we can reuse the vertex data
+                    can_reuse = True
+
+                    if have_texcoords:
+                        # Check if the vertex texcoord matches. This might not be
+                        # the cases on corners
+                        u, v = uv_coordinates[poly.loop_indices[idx]].uv.to_2d()
+                        uv_key = u * 10000.0 + v
+                        if abs(vertex_uvs[vertex_index] - uv_key) > 0.0001:
+                            # Vertex uv does *not* match. Most likely we are on an
+                            # edge, so duplicate the vertex
+                            can_reuse = False
+                            num_duplicated += 1
+
+                    # If we can reuse the vertex data, just reference it
+                    if can_reuse:
+                        index_buffer.append(vertex_mappings[vertex_index])
+                        continue
 
                 # If the vertex is not known, store its data and then write its index
+                vertex = vertices[vertex_index]
+
+                # Write the vertex object position
+                vertex_buffer.append(vertex.co[0])
+                vertex_buffer.append(vertex.co[1])
+                vertex_buffer.append(vertex.co[2])
+
+                # Write the vertex normal
+                # When smooth shading is enabled, write per vertex normals,
+                # otherwise write the per-poly normal for all vertices
+                if is_smooth:
+                    vertex_buffer.append(vertex.normal[0])
+                    vertex_buffer.append(vertex.normal[1])
+                    vertex_buffer.append(vertex.normal[2])
                 else:
-                    vertex = vertices[vertex_index]
+                    vertex_buffer.append(poly.normal[0])
+                    vertex_buffer.append(poly.normal[1])
+                    vertex_buffer.append(poly.normal[2])
 
-                    # Write the vertex object position
-                    vertex_buffer.append(vertex.co[0])
-                    vertex_buffer.append(vertex.co[1])
-                    vertex_buffer.append(vertex.co[2])
+                # Add the texcoord
+                if have_texcoords:
+                    u, v = uv_coordinates[poly.loop_indices[idx]].uv.to_2d()
+                    vertex_buffer.append(u)
+                    vertex_buffer.append(v)
+                    vertex_uvs[vertex_index] = u * 10000.0 + v
 
-                    # Write the vertex normal
-                    # When smooth shading is enabled, write per vertex normals,
-                    # otherwise write the per-poly normal for all vertices
-                    if is_smooth:
-                        vertex_buffer.append(vertex.normal[0])
-                        vertex_buffer.append(vertex.normal[1])
-                        vertex_buffer.append(vertex.normal[2])
-                    else:
-                        vertex_buffer.append(poly.normal[0])
-                        vertex_buffer.append(poly.normal[1])
-                        vertex_buffer.append(poly.normal[2])
+                # Store the vertex index in the triangle data
+                index_buffer.append(num_vertices)
 
-                    # Add the texcoord
-                    if have_texcoords:
-                        uv = uv_coordinates[poly.loop_indices[idx]].uv
-                        vertex_buffer.append(uv[0])
-                        vertex_buffer.append(uv[1])
-
-                    # Store the vertex index in the triangle data
-                    index_buffer.append(num_vertices)
-
-                    # Store the vertex index in the mappings and increment the
-                    # vertex counter
-                    vertex_mappings[vertex_index] = num_vertices
-                    num_vertices += 1
+                # Store the vertex index in the mappings and increment the
+                # vertex counter
+                vertex_mappings[vertex_index] = num_vertices
+                num_vertices += 1
 
             num_triangles += 1
 
@@ -203,6 +223,7 @@ class GeometryWriter:
         # Increment statistics
         self.writer._stats_exported_vertices += num_vertices
         self.writer._stats_exported_tris += num_triangles
+        self.writer._stats_duplicated_vertices += num_duplicated
         self.writer._stats_exported_geoms += 1
 
         return geom
