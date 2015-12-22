@@ -1,6 +1,3 @@
-[submodule "pybamwriter"]
-	path = src/pybamwriter
-	url = https://github.com/rdb/pybamwriter
 [submodule "src/pybamwriter"]
 	path = src/pybamwriter
 	url = https://github.com/rdb/pybamwriter

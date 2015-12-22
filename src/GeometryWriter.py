@@ -41,7 +41,7 @@ class GeometryWriter:
         self.gvd_formats['v3n3'].add_column("vertex", 3, GeomEnums.NT_float32,
                                 GeomEnums.C_point, start=0, column_alignment=4)
         self.gvd_formats['v3n3'].add_column("normal", 3, GeomEnums.NT_float32,
-                                GeomEnums.C_vector, start=3 * 4, column_alignment=4)
+                                GeomEnums.C_normal, start=3 * 4, column_alignment=4)
 
         # Standard format with texcoords, Vertex + Normal + Texcoord (UV)
         self.gvd_formats['v3n3t2'] = GeomVertexArrayFormat()
@@ -51,7 +51,7 @@ class GeometryWriter:
         self.gvd_formats['v3n3t2'].add_column("vertex", 3, GeomEnums.NT_float32,
                                 GeomEnums.C_point, start=0, column_alignment=4)
         self.gvd_formats['v3n3t2'].add_column("normal", 3, GeomEnums.NT_float32,
-                                GeomEnums.C_vector, start=3 * 4, column_alignment=4)
+                                GeomEnums.C_normal, start=3 * 4, column_alignment=4)
         self.gvd_formats['v3n3t2'].add_column("texcoord", 2, GeomEnums.NT_float32,
                                 GeomEnums.C_texcoord, start=2 * 3 * 4, column_alignment=4)
 
