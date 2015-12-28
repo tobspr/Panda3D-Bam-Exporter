@@ -5,6 +5,7 @@ import shutil
 
 from Util import convert_blender_file_format, convert_to_panda_filepath
 
+from ExportException import ExportException
 from pybamwriter.panda_types import *
 
 class TextureWriter(object):
@@ -82,7 +83,7 @@ class TextureWriter(object):
             # Process texture settings
 
             # Mipmapping
-            if tex_handle.use_mipmap:
+            if hasattr(tex_handle, "use_mipmap") and tex_handle.use_mipmap:
                 state.minfilter = SamplerState.FT_linear_mipmap_linear
             else:
                 state.minfilter = SamplerState.FT_linear
@@ -97,11 +98,12 @@ class TextureWriter(object):
                 "CHECKER": SamplerState.WM_repeat
             }
 
-            if tex_handle.extension in wrap_modes:
-                wrap_mode = wrap_modes[tex_handle.extension]
-                state.wrap_u, state.wrap_v, state.wrap_w = [wrap_mode] * 3
-            else:
-                print("Unkown texture extension:", tex_handle.extension)
+            if hasattr(tex_handle, "extension"):
+                if tex_handle.extension in wrap_modes:
+                    wrap_mode = wrap_modes[tex_handle.extension]
+                    state.wrap_u, state.wrap_v, state.wrap_w = [wrap_mode] * 3
+                else:
+                    print("Unkown texture extension:", tex_handle.extension)
 
             # Improve texture sharpness
             state.anisotropic_degree = 8
@@ -212,8 +214,11 @@ class TextureWriter(object):
 
         elif texture.type in ["BLEND", "CLOUDS", "DISTORTED_NOISE", "ENVIRONMENT_MAP", 
             "MAGIC", "MARBLE", "MUSGRAVE", "NOISE", "OCEAN", "POINT_DENSITY",
-            "STUCCI", "VORONOI", "WOOD"]:
+            "STUCCI", "VORONOI", "VOXEL_DATA", "WOOD"]:
             print("TODO: Handle generated image")
+
+
+
             return None
 
         else:

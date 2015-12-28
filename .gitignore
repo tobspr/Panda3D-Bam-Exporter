@@ -3,3 +3,6 @@ __pycache__
 *.sublime-workspace
 test.bam
 show.py
+rp/tex
+rp/preview.bam
+rp/output.png

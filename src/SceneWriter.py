@@ -51,7 +51,7 @@ class SceneWriter:
         first, and then exporting that to a bam file """
         
         # Make the output easier to read - just for debugging!
-        os.system("cls")
+        # os.system("cls")
         start_time = time.time()
 
         # Create the root of our model. All objects will be parented to this
@@ -83,7 +83,7 @@ class SceneWriter:
 
     def _handle_camera(self, obj):
         """ Internal method to handle a camera """
-        pass
+        self._handle_empty(obj)
 
     def _handle_light(self, obj):
          """ Internal method to handle a light """
@@ -183,7 +183,8 @@ class SceneWriter:
             virtual_material.diffuse = (
                 material.pbepbs.basecolor[0],
                 material.pbepbs.basecolor[1],
-                material.pbepbs.basecolor[2], material.pbepbs.bumpmap_strength)
+                material.pbepbs.basecolor[2],
+                material.pbepbs.bumpmap_strength)
             virtual_material.specular = (
                 material.pbepbs.specular,
                 material.pbepbs.metallic,

@@ -26,21 +26,19 @@ class PBSMaterial(bpy.types.Panel):
         box = self.layout.box()
         box.row().prop(context.material.pbepbs, "basecolor")
 
-
-
         # row = self.layout.row()
         box.row().prop(context.material.pbepbs, "roughness")
         box.row().prop(context.material.pbepbs, "metallic")
         box.row().prop(context.material.pbepbs, "specular")
-
+        box.row().prop(context.material.pbepbs, "emissive_factor")
+        box.row().prop(context.material.pbepbs, "translucency")
+        box.row().prop(context.material.pbepbs, "transparency")
         box.row().prop(context.material.pbepbs, "bumpmap_strength")
 
         self.layout.separator()
 
         self.layout.label("Material options:")
 
-        self.layout.row().operator("pbepbs.set_default_diffuse")
-        self.layout.row().operator("pbepbs.set_default_metallic")
         self.layout.row().operator("pbepbs.set_default_textures")
 
 
@@ -83,9 +81,28 @@ class PBSMatProps(bpy.types.PropertyGroup):
         default=[1.0, 1.0, 1.0],
         min=0.0,
         max=1.0)
+    
+    emissive_factor = bpy.props.FloatProperty(
+        name="Emissive Factor",
+        description="Values > 0.0 make the material emissive, recieving no shading "
+                    "but emitting light with a color of the BaseColor instead",
+        subtype="FACTOR",
+        default=0.0,min=0.0, max=20.0)
+
+    translucency = bpy.props.FloatProperty(
+        name="Translucency",
+        description="Makes the material translucent, e.g. for skin and leafes.",
+        subtype="FACTOR",
+        default=0.0,min=0.0, max=1.0)
+
+    transparency = bpy.props.FloatProperty(
+        name="Transparency",
+        description="This will cause the material to render transparent.",
+        subtype="FACTOR",
+        default=1.0,min=0.0, max=1.0)
 
     bumpmap_strength = bpy.props.FloatProperty(
-            name="Bump-Map Strength",
+            name="Bumpmap Strength",
             description="Strength of the Bump Map",
             subtype="FACTOR",
             default=0.0, min=0.0, max=1.0)
@@ -146,37 +163,7 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class OperatorDefaultDiffuse(bpy.types.Operator):
-    """ Operator to set the default diffuse properties on a material """
-    bl_idname = "pbepbs.set_default_diffuse"
-    bl_label = "Set default PBS diffuse material"
- 
-    def execute(self, context):
-        context.material.pbepbs.basecolor = [1, 1, 1]
-        context.material.pbepbs.specular = 0.5
-        context.material.pbepbs.metallic = 0.0
-        context.material.pbepbs.roughness = 0.3
-        context.material.pbepbs.bumpmap_strength = 0.0
-        return {'FINISHED'}
-
-
-class OperatorDefaultMetallic(bpy.types.Operator):
-    """ Operator to set the default metallic properties on a material """
-    bl_idname = "pbepbs.set_default_metallic"
-    bl_label = "Set default PBS metallic material"
- 
-    def execute(self, context):
-        context.material.pbepbs.basecolor = [1, 1, 1]
-        context.material.pbepbs.specular = 0.5
-        context.material.pbepbs.metallic = 1.0
-        context.material.pbepbs.roughness = 0.4
-        context.material.pbepbs.bumpmap_strength = 0.0
-        return {'FINISHED'}
-
-
 def register():
-    bpy.utils.register_class(OperatorDefaultDiffuse)
-    bpy.utils.register_class(OperatorDefaultMetallic)
     bpy.utils.register_class(OperatorSetDefaultTextures)
     bpy.utils.register_class(PBSMatProps)
     bpy.utils.register_class(PBSMaterial)
@@ -185,10 +172,6 @@ def register():
 
 def unregister():
     del bpy.types.Material.pbepbs
-    
-    bpy.utils.unregister_class(OperatorDefaultDiffuse)
-    bpy.utils.unregister_class(OperatorDefaultMetallic)
     bpy.utils.unregister_class(OperatorSetDefaultTextures)
     bpy.utils.unregister_class(PBSMatProps)
     bpy.utils.unregister_class(PBSMaterial)
-
