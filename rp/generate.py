@@ -1,5 +1,11 @@
 from __future__ import print_function
 
+
+# Enter the path to the render pipeline here, without trailing slash
+RP_PATH = "E:/Projects/Brainz stuff/RenderPipeline"
+
+
+
 import sys
 import os
 from panda3d.core import *
@@ -16,7 +22,6 @@ except:
     print("Invalid window size! Using 512 x 512")
     w, h = 512, 512
 
-RP_PATH = "E:/Projects/Brainz stuff/RenderPipeline"
 rp_fpath = Filename.from_os_specific(RP_PATH)
 
 sys.path.insert(0, RP_PATH)
@@ -34,7 +39,7 @@ class MainBase(ShowBase):
         self.rp.set_empty_loading_screen()
         self.rp.create()
 
-        self.rp.get_daytime_mgr().set_time(0.45)
+        self.rp.daytime_mgr.set_time(0.45)
 
         model = loader.loadModel("preview.bam")
         model.reparent_to(render)
@@ -52,7 +57,8 @@ class MainBase(ShowBase):
             transform_mat = main_cam.get_transform(render).get_mat()
             transform_mat = Mat4.convert_mat(CS_zup_right, CS_yup_right) * transform_mat
             base.camera.set_mat(transform_mat)
-            print("Transform mat = ", transform_mat)
+        else:
+            print("WARNING: No camera found")
 
 app = MainBase()
 for i in range(1):
