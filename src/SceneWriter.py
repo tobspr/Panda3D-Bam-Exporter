@@ -50,7 +50,7 @@ class SceneWriter:
         """ Writes out the bam file, convertin the scene to a virtual scene graph
         first, and then exporting that to a bam file """
         
-        # Make the output easier to read - just for debugging!
+        # Make the output easier to read - just for debugging
         # os.system("cls")
         start_time = time.time()
 
@@ -188,24 +188,26 @@ class SceneWriter:
                 material.specular_color[1] * material.specular_intensity,
                 material.specular_color[2] * material.specular_intensity,
                 material.specular_alpha)
-            virtual_material.emissive = (
+            virtual_material.emission = (
                 material.emit * material.diffuse_color[0] * material.diffuse_intensity,
                 material.emit * material.diffuse_color[1] * material.diffuse_intensity,
                 material.emit * material.diffuse_color[2] * material.diffuse_intensity,
                 1.0)
         else:
-            virtual_material.diffuse = (
+            virtual_material.base_color = (
                 material.pbepbs.basecolor[0],
                 material.pbepbs.basecolor[1],
                 material.pbepbs.basecolor[2],
-                material.pbepbs.bumpmap_strength)
-            virtual_material.specular = (
-                material.pbepbs.specular,
-                material.pbepbs.metallic,
-                material.pbepbs.roughness,
-                1)
-            virtual_material.ambient = (0, 0, 0, 1)
-            virtual_material.emissive = (0, 0, 0, 1)
+                material.pbepbs.transparency)
+            virtual_material.metallic = 1.0 if material.pbepbs.metallic else 0.0
+            virtual_material.roughness = material.pbepbs.roughness
+            virtual_material.refractive_index = material.pbepbs.ior
+            print("Writing roughness:", material.pbepbs.roughness)
+            virtual_material.emission = (
+                material.pbepbs.normal_strength,
+                0.0,
+                material.pbepbs.translucency,
+                material.pbepbs.emissive_factor)
 
         # Attach the material attribute to the render state
         virtual_state.attributes.append(MaterialAttrib(virtual_material))

@@ -21,25 +21,31 @@ class PBSMaterial(bpy.types.Panel):
             self.layout.label("No PBS datablock")
             return
 
-        self.layout.label("PBS Material Properties:")
-
         box = self.layout.box()
         box.row().prop(context.material.pbepbs, "basecolor")
-
-        # row = self.layout.row()
-        box.row().prop(context.material.pbepbs, "roughness")
         box.row().prop(context.material.pbepbs, "metallic")
-        box.row().prop(context.material.pbepbs, "specular")
+        box.row().prop(context.material.pbepbs, "roughness")
+
+        if not context.material.pbepbs.metallic:
+            box.row().prop(context.material.pbepbs, "ior")
+
+        box.row().prop(context.material.pbepbs, "normal_strength")
+        box.row()        
+        
+        self.layout.separator()
+
+        box = self.layout.box()
+        box.label("Special properties")
         box.row().prop(context.material.pbepbs, "emissive_factor")
         box.row().prop(context.material.pbepbs, "translucency")
         box.row().prop(context.material.pbepbs, "transparency")
-        box.row().prop(context.material.pbepbs, "bumpmap_strength")
+        box.row()
+        # self.layout.separator()
+
+        self.layout.label("Operators:")
+        self.layout.row().operator("pbepbs.set_default_textures")
 
         self.layout.separator()
-
-        self.layout.label("Material options:")
-
-        self.layout.row().operator("pbepbs.set_default_textures")
 
 
     def draw_header(self, context):
@@ -59,18 +65,16 @@ class PBSMatProps(bpy.types.PropertyGroup):
         subtype="FACTOR",
         default=0.3, min=0.0, max=1.0)
 
-    specular = bpy.props.FloatProperty(
-        name="Specular",
-        description="Specular factor for the material, should be 0.5 for most "
-                    "materials, except in special cases",
+    ior = bpy.props.FloatProperty(
+        name="IOR",
+        description="Index of refraction, usually 1.5 for most materials.",
         subtype="FACTOR",
-        default=0.5, min=0.0, max=1.0)
+        default=1.5, min=1.0, max=2.7)
 
-    metallic = bpy.props.FloatProperty(
+    metallic = bpy.props.BoolProperty(
         name="Metallic",
-        description="Metallic factor, should be either 0 or 1.",
-        subtype="FACTOR",
-        default=0.0, min=0.0, max=1.0)
+        description="Controls whether the material is metallic or not.",
+        default=False)
 
     basecolor = bpy.props.FloatVectorProperty(
         name="BaseColor",
@@ -91,21 +95,23 @@ class PBSMatProps(bpy.types.PropertyGroup):
 
     translucency = bpy.props.FloatProperty(
         name="Translucency",
-        description="Makes the material translucent, e.g. for skin and leafes.",
+        description="Makes the material translucent, e.g. for skin and foliage.",
         subtype="FACTOR",
         default=0.0,min=0.0, max=1.0)
 
     transparency = bpy.props.FloatProperty(
         name="Transparency",
-        description="This will cause the material to render transparent.",
+        description="This will cause the material to render transparent. A value of "
+                    "1.0 means a full opaque material, a value of 0.0 makes the material"
+                    "fully transparent.",
         subtype="FACTOR",
         default=1.0,min=0.0, max=1.0)
 
-    bumpmap_strength = bpy.props.FloatProperty(
-            name="Bumpmap Strength",
-            description="Strength of the Bump Map",
-            subtype="FACTOR",
-            default=0.0, min=0.0, max=1.0)
+    normal_strength = bpy.props.FloatProperty(
+            name="Normalmap Strength",
+            description="Strength of the Normal-Map, a value of 0.0 will cause no "
+                        "normal mapping",
+            subtype="FACTOR", default=0.0, min=0.0, max=1.0)
 
 
 class OperatorSetDefaultTextures(bpy.types.Operator):
@@ -114,8 +120,8 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
     bl_idname = "pbepbs.set_default_textures"
     bl_label = "Fill default PBS textures"
 
-    def execute(self, context):
 
+    def execute(self, context):
         if not hasattr(context, "material"):
             return {'CANCELLED'}
         print("Executing default texture operator")
@@ -123,7 +129,6 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
 
         for index, slot_name in enumerate(["BaseColor", "Normal", "Specular", "Roughness"]):
             slot = material.texture_slots[index]
-            # print("SLOT = ", slot)
             if slot is not None and slot.texture is not None:
                 print("Skipping used slot #", index)
                 continue
@@ -147,11 +152,9 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
             texture = None
             for tex in bpy.data.textures:
                 if tex.name == texname:
-                    # print("FOUND TEX")
                     texture = tex
                     break
             else:
-                # print("LOAD TEX")
                 texture = bpy.data.textures.new(texname, type="IMAGE")
 
             print("Setting image:", image)

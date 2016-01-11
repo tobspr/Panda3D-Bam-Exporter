@@ -259,7 +259,7 @@ class GeometryWriter:
             # Convert the object to a mesh, so we can read the polygons
             mesh = obj.to_mesh(self.writer.context.scene, 
                 apply_modifiers = True, 
-                settings = 'RENDER', 
+                settings = 'PREVIEW', 
                 calc_tessface = True, 
                 calc_undeformed = True)
 
