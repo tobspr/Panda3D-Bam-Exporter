@@ -327,7 +327,4 @@ class GeometryWriter:
 
         parent_node.add_child(virtual_geom_node)
 
-        # Finally attach the geom node to the model root
-        self.writer.virtual_model_root.add_child(parent_node)
-
-
+        return parent_node

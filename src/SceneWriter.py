@@ -100,6 +100,8 @@ class SceneWriter:
         virtual_node = PandaNode(obj.name)
         virtual_node.transform = transformState
 
+        self._set_tags(obj, virtual_node)
+
         # Attach the node to the scene graph
         self.virtual_model_root.add_child(virtual_node)
 
@@ -119,6 +121,12 @@ class SceneWriter:
         """ Internal method to handle a lattice """
         print("TODO: Handle armature:",obj.name)
 
+    def _handle_mesh(self, obj):
+        """ Internal method to handle a mesh """
+        panda_node = self.geometry_writer.write_mesh(obj)
+        self._set_tags(obj, panda_node)
+        self.virtual_model_root.add_child(panda_node)
+
     def _handle_object(self, obj):
         """ Internal method to process an object during the export process """
         print("Exporting object:", obj.name)
@@ -132,7 +140,7 @@ class SceneWriter:
         elif obj.type == "LAMP":
             self._handle_light(obj)
         elif obj.type == "MESH":
-            self.geometry_writer.write_mesh(obj)
+            self._handle_mesh(obj)
         elif obj.type == "EMPTY":
             self._handle_empty(obj)
         elif obj.type == "CURVE":
@@ -155,8 +163,18 @@ class SceneWriter:
             parent_transform = obj.matrix_world
             for sub_obj in obj.dupli_group.objects:
                 print("Exporting duplicated object:", sub_obj.name, "for parent", obj.name)
-                self.geometry_writer.write_mesh(sub_obj, parent_transform)
+                panda_node = self.geometry_writer.write_mesh(sub_obj, parent_transform)
+                self.virtual_model_root.add_child(panda_node)
             return
+
+    def _set_tags(self, obj, panda_node):
+        """ Reads all game object tags from the given object handle and applies
+        it to the given panda node """
+        for prop in obj.game.properties:
+            name = prop.name
+            val = str(prop.value)
+            print("Writing tags", name, val)
+            panda_node.tags[name] = val
 
     def _create_state_from_material(self, material):
         """ Creates a render state based on a material """
@@ -264,6 +282,7 @@ class SceneWriter:
             scale = mathutils.Matrix.Scale(particle.size, 3).to_4x4()
             particle_mat = location * rotation * scale
 
-            self.geometry_writer.write_mesh(duplicated_object, custom_transform=particle_mat)
+            panda_node = self.geometry_writer.write_mesh(duplicated_object, custom_transform=particle_mat)
+            self.virtual_model_root.add_child(panda_node)
 
         print("Wrote", len(particle_system.particles), "particles for system", particle_system.name)
