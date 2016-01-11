@@ -14,6 +14,8 @@ included when you use the `Download ZIP` button.
 
 After cloning, make sure to execute `git submodule init` and then `git submodule update`.
 
+If you want the preview to work, you need to adjust the path to the render pipeline
+in `rp/generate.py`.
 
 
 ### Usage
