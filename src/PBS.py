@@ -1,5 +1,6 @@
 
 import bpy
+import math
 
 from os.path import join, dirname, abspath
 
@@ -22,7 +23,8 @@ class PBSMaterial(bpy.types.Panel):
             return
 
         box = self.layout.box()
-        box.row().prop(context.material.pbepbs, "basecolor")
+        box.row().prop(context.material, "diffuse_color", "Base Color")
+
         box.row().prop(context.material.pbepbs, "metallic")
         box.row().prop(context.material.pbepbs, "roughness")
 
@@ -30,15 +32,15 @@ class PBSMaterial(bpy.types.Panel):
             box.row().prop(context.material.pbepbs, "ior")
 
         box.row().prop(context.material.pbepbs, "normal_strength")
-        box.row()        
-        
+        box.row()
+
         self.layout.separator()
 
         box = self.layout.box()
         box.label("Special properties")
         box.row().prop(context.material.pbepbs, "emissive_factor")
         box.row().prop(context.material.pbepbs, "translucency")
-        box.row().prop(context.material.pbepbs, "transparency")
+        box.row().prop(context.material, "alpha", "Transparency")
         box.row()
         # self.layout.separator()
 
@@ -58,11 +60,20 @@ class PBSMatProps(bpy.types.PropertyGroup):
     """ This is the property group which stores the PBS properties of each
     material """
 
+    def update_roughness(self, context):
+        if self.roughness <= 0.0:
+            context.material.specular_hardness = 511
+        else:
+            a = self.roughness * self.roughness
+            context.material.specular_hardness = min(2 / (a * a) - 2, 511)
+
+
     roughness = bpy.props.FloatProperty(
         name="Roughness",
         description="The roughness of the material, 0 for perfect flat surfaces, "
                     "1 for complete rough surfaces.",
         subtype="FACTOR",
+        update=update_roughness,
         default=0.3, min=0.0, max=1.0)
 
     ior = bpy.props.FloatProperty(
@@ -76,19 +87,9 @@ class PBSMatProps(bpy.types.PropertyGroup):
         description="Controls whether the material is metallic or not.",
         default=False)
 
-    basecolor = bpy.props.FloatVectorProperty(
-        name="BaseColor",
-        description="Base color of the material. In case of non-metallic materials, "
-                    "this denotes the diffuse color. In case of metallic materials, "
-                    "this denotes the specular color",
-        subtype="COLOR",
-        default=[1.0, 1.0, 1.0],
-        min=0.0,
-        max=1.0)
-    
     emissive_factor = bpy.props.FloatProperty(
         name="Emissive Factor",
-        description="Values > 0.0 make the material emissive, recieving no shading "
+        description="Values > 0.0 make the material emissive, receiving no shading "
                     "but emitting light with a color of the BaseColor instead",
         subtype="FACTOR",
         default=0.0,min=0.0, max=20.0)
@@ -98,14 +99,6 @@ class PBSMatProps(bpy.types.PropertyGroup):
         description="Makes the material translucent, e.g. for skin and foliage.",
         subtype="FACTOR",
         default=0.0,min=0.0, max=1.0)
-
-    transparency = bpy.props.FloatProperty(
-        name="Transparency",
-        description="This will cause the material to render transparent. A value of "
-                    "1.0 means a full opaque material, a value of 0.0 makes the material"
-                    "fully transparent.",
-        subtype="FACTOR",
-        default=1.0,min=0.0, max=1.0)
 
     normal_strength = bpy.props.FloatProperty(
             name="Normalmap Strength",
