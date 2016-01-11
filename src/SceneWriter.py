@@ -104,26 +104,28 @@ class SceneWriter:
         self.virtual_model_root.add_child(virtual_node)
 
     def _handle_curve(self, obj):
-         """ Internal method to handle a curve """
-         pass
+        """ Internal method to handle a curve """
+        print("TODO: Handle curve:", obj.name)
 
     def _handle_font(self, obj):
         """ Internal method to handle a font """
-        pass
+        print("TODO: Handle font:",obj.name)
 
     def _handle_lattice(self, obj):
         """ Internal method to handle a lattice """
-        pass
+        print("TODO: Handle lattice:",obj.name)
 
     def _handle_armature(self, obj):
         """ Internal method to handle a lattice """
-        pass
+        print("TODO: Handle armature:",obj.name)
 
     def _handle_object(self, obj):
         """ Internal method to process an object during the export process """
         print("Exporting object:", obj.name)
 
         self._stats_exported_objs += 1
+
+        self._check_dupli(obj)
 
         if obj.type == "CAMERA":
             self._handle_camera(obj)
@@ -143,6 +145,18 @@ class SceneWriter:
             self._handle_armature(obj)
         else:
             raise ExportException("Object " + obj.name + " has a non implemented type: '" + obj.type + "'")
+
+    def _check_dupli(self, obj):
+        """ Checks for a dupli group """
+        if obj.dupli_type != "NONE":
+            if obj.dupli_type != "GROUP":
+                print("Warning: unsupported dupli type:", obj.dupli_type)
+                return
+            parent_transform = obj.matrix_world
+            for sub_obj in obj.dupli_group.objects:
+                print("Exporting duplicated object:", sub_obj.name, "for parent", obj.name)
+                self.geometry_writer.write_mesh(sub_obj, parent_transform)
+            return
 
     def _create_state_from_material(self, material):
         """ Creates a render state based on a material """

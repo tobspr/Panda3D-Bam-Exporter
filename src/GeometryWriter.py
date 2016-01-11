@@ -237,7 +237,7 @@ class GeometryWriter:
         transformState.mat = obj.matrix_world
 
         if custom_transform:
-            transformState.mat = custom_transform
+            transformState.mat *= custom_transform
     
         parent_node = PandaNode(obj.name)
         parent_node.transform = transformState

@@ -23,11 +23,15 @@ class TextureWriter(object):
 
         # Fetch old filename first
         old_filename = bpy.path.abspath(image.filepath)
+        if old_filename == "":
+            # Empty texture, rename it to the textures name
+            old_filename = image.name + ".png"
 
         # Extract image name from filepath and create a new filename
         tex_name = bpy.path.basename(old_filename)
         dest_filename = os.path.join(
             os.path.dirname(self.writer.filepath), str(self.writer.settings.tex_copy_path), tex_name)
+
 
         # Check if the target directory exists, and if not, create it
         target_dir = os.path.dirname(dest_filename)
@@ -89,6 +93,9 @@ class TextureWriter(object):
                 state.minfilter = SamplerState.FT_linear
             state.magfilter = SamplerState.FT_linear
 
+            # Override mipmap setting, is desired most of the time
+            state.minfilter = SamplerState.FT_linear_mipmap_linear
+
             # Texture wrap modes
             wrap_modes = {
                 "EXTEND": SamplerState.WM_clamp,
@@ -106,7 +113,7 @@ class TextureWriter(object):
                     print("Unkown texture extension:", tex_handle.extension)
 
             # Improve texture sharpness
-            state.anisotropic_degree = 8
+            state.anisotropic_degree = 16
 
         return state
 
