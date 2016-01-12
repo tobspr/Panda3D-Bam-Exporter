@@ -213,10 +213,10 @@ class SceneWriter:
                 1.0)
         else:
             virtual_material.base_color = (
-                material.pbepbs.basecolor[0],
-                material.pbepbs.basecolor[1],
-                material.pbepbs.basecolor[2],
-                material.pbepbs.transparency)
+                material.diffuse_color[0],
+                material.diffuse_color[1],
+                material.diffuse_color[2],
+                material.alpha)
             virtual_material.metallic = 1.0 if material.pbepbs.metallic else 0.0
             virtual_material.roughness = material.pbepbs.roughness
             virtual_material.refractive_index = material.pbepbs.ior
