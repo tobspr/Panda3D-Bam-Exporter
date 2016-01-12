@@ -55,15 +55,15 @@ class SceneWriter:
         start_time = time.time()
 
         # Create the root of our model. All objects will be parented to this
-        self.virtual_model_root = ModelRoot("SceneRoot")
+        virtual_model_root = ModelRoot("SceneRoot")
 
         # Handle all selected objects
         for obj in self.objects:
-            self._handle_object(obj)
+            self._handle_object(obj, virtual_model_root)
 
         writer = BamWriter()
         writer.open_file(self.filepath)
-        writer.write_object(self.virtual_model_root)
+        writer.write_object(virtual_model_root)
         writer.close()
 
         end_time = time.time()
@@ -81,90 +81,109 @@ class SceneWriter:
         print("Exported", len(self.texture_writer.textures_cache.keys()), "texture slots, using", len(self.texture_writer.images_cache.keys()), "images")
         print("-" * 79)
 
-    def _handle_camera(self, obj):
+    def _handle_camera(self, obj, parent):
         """ Internal method to handle a camera """
-        self._handle_empty(obj)
+        pass
 
-    def _handle_light(self, obj):
-         """ Internal method to handle a light """
-         pass
+    def _handle_light(self, obj, parent):
+        """ Internal method to handle a light """
+        pass
 
-    def _handle_empty(self, obj):
+    def _handle_empty(self, obj, parent):
         """ Internal method to handle an empty object """
+        pass
 
-        # Create the transform state based on the object
-        transformState = TransformState()
-        transformState.mat = obj.matrix_world
-
-        # Create a new panda node with the transform
-        virtual_node = PandaNode(obj.name)
-        virtual_node.transform = transformState
-
-        self._set_tags(obj, virtual_node)
-
-        # Attach the node to the scene graph
-        self.virtual_model_root.add_child(virtual_node)
-
-    def _handle_curve(self, obj):
+    def _handle_curve(self, obj, parent):
         """ Internal method to handle a curve """
         print("TODO: Handle curve:", obj.name)
 
-    def _handle_font(self, obj):
+    def _handle_font(self, obj, parent):
         """ Internal method to handle a font """
         print("TODO: Handle font:",obj.name)
 
-    def _handle_lattice(self, obj):
+    def _handle_lattice(self, obj, parent):
         """ Internal method to handle a lattice """
         print("TODO: Handle lattice:",obj.name)
 
-    def _handle_armature(self, obj):
+    def _handle_armature(self, obj, parent):
         """ Internal method to handle a lattice """
         print("TODO: Handle armature:",obj.name)
 
-    def _handle_mesh(self, obj):
+    def _handle_mesh(self, obj, parent):
         """ Internal method to handle a mesh """
-        panda_node = self.geometry_writer.write_mesh(obj)
-        self._set_tags(obj, panda_node)
-        self.virtual_model_root.add_child(panda_node)
+        self.geometry_writer.write_mesh(obj, parent)
 
-    def _handle_object(self, obj):
+    def _handle_lod(self, obj, lod_node):
+        """ Internal method to handle LOD levels """
+
+        distances = [level.distance for level in obj.lod_levels]
+        distances.append(float('inf'))
+
+        for i, level in enumerate(obj.lod_levels):
+            lod_node.add_switch(distances[i+1], distances[i])
+
+            if level.use_mesh:
+                self._handle_object_data(level.object, lod_node)
+            else:
+                self._handle_object_data(object, lod_node)
+
+    def _handle_object(self, obj, parent):
         """ Internal method to process an object during the export process """
         print("Exporting object:", obj.name)
 
         self._stats_exported_objs += 1
 
-        self._check_dupli(obj)
+        # Create a new panda node with the transform
+        if len(obj.lod_levels) > 0:
+            node = LODNode(obj.name)
+            self._handle_lod(obj, node)
+        else:
+            node = PandaNode(obj.name)
+            self._handle_object_data(obj, node)
+
+        # Create the transform state based on the object
+        node.transform = TransformState()
+        node.transform.mat = obj.matrix_world
+
+        # Attach the node to the scene graph
+        parent.add_child(node)
+
+        self._set_tags(obj, node)
+
+        self._check_dupli(obj, node)
+
+    def _handle_object_data(self, obj, parent):
+        """ Internal method to process an object datablock """
 
         if obj.type == "CAMERA":
-            self._handle_camera(obj)
+            self._handle_camera(obj, parent)
         elif obj.type == "LAMP":
-            self._handle_light(obj)
+            self._handle_light(obj, parent)
         elif obj.type == "MESH":
-            self._handle_mesh(obj)
+            self._handle_mesh(obj, parent)
         elif obj.type == "EMPTY":
-            self._handle_empty(obj)
+            self._handle_empty(obj, parent)
         elif obj.type == "CURVE":
-            self._handle_curve(obj)
+            self._handle_curve(obj, parent)
         elif obj.type == "FONT":
-            self._handle_font(obj)
+            self._handle_font(obj, parent)
         elif obj.type == "LATTICE":
-            self._handle_lattice(obj)
+            self._handle_lattice(obj, parent)
         elif obj.type == "ARMATURE":
-            self._handle_armature(obj)
+            self._handle_armature(obj, parent)
         else:
             raise ExportException("Object " + obj.name + " has a non implemented type: '" + obj.type + "'")
 
-    def _check_dupli(self, obj):
+    def _check_dupli(self, obj, parent):
         """ Checks for a dupli group """
         if obj.dupli_type != "NONE":
             if obj.dupli_type != "GROUP":
                 print("Warning: unsupported dupli type:", obj.dupli_type)
                 return
-            parent_transform = obj.matrix_world
+
             for sub_obj in obj.dupli_group.objects:
                 print("Exporting duplicated object:", sub_obj.name, "for parent", obj.name)
-                panda_node = self.geometry_writer.write_mesh(sub_obj, parent_transform)
-                self.virtual_model_root.add_child(panda_node)
+                self._handle_object(sub_obj, parent)
             return
 
     def _set_tags(self, obj, panda_node):

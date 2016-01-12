@@ -229,18 +229,8 @@ class GeometryWriter:
         return geom
 
 
-    def write_mesh(self, obj, custom_transform=None):
+    def write_mesh(self, obj, parent, custom_transform=None):
         """ Internal method to process a mesh during the export process """
-
-        # Create the transform state
-        transformState = TransformState()
-        transformState.mat = obj.matrix_world
-
-        if custom_transform:
-            transformState.mat = custom_transform
-
-        parent_node = PandaNode(obj.name)
-        parent_node.transform = transformState
 
         for modifier in obj.modifiers:
             if modifier.type == "PARTICLE_SYSTEM":
@@ -325,6 +315,4 @@ class GeometryWriter:
 
             self.geom_cache[obj.data.name] = virtual_geom_node
 
-        parent_node.add_child(virtual_geom_node)
-
-        return parent_node
+        parent.add_child(virtual_geom_node)
