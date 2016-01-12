@@ -237,24 +237,24 @@ class GeometryWriter:
         transformState.mat = obj.matrix_world
 
         if custom_transform:
-            transformState.mat *= custom_transform
-    
+            transformState.mat = custom_transform
+
         parent_node = PandaNode(obj.name)
         parent_node.transform = transformState
 
+        for modifier in obj.modifiers:
+            if modifier.type == "PARTICLE_SYSTEM":
+                particle_system = modifier.particle_system
+                self.writer.handle_particle_system(obj, particle_system)
+
         # Check if we alrady have the geom node cached
-        if obj.name in self.geom_cache:
-            virtual_geom_node = self.geom_cache[obj.name]
+        if obj.data.name in self.geom_cache:
+            virtual_geom_node = self.geom_cache[obj.data.name]
 
         else:
 
             # Create a new geom node to store all geoms
-            virtual_geom_node = GeomNode("GN" + obj.name)
-
-            for modifier in obj.modifiers:
-                if modifier.type == "PARTICLE_SYSTEM":
-                    particle_system = modifier.particle_system
-                    self.writer.handle_particle_system(obj, particle_system)
+            virtual_geom_node = GeomNode(obj.data.name)
 
             # Convert the object to a mesh, so we can read the polygons
             mesh = obj.to_mesh(self.writer.context.scene, 
@@ -323,7 +323,7 @@ class GeometryWriter:
 
             bpy.data.meshes.remove(mesh)
 
-            self.geom_cache[obj.name] = virtual_geom_node
+            self.geom_cache[obj.data.name] = virtual_geom_node
 
         parent_node.add_child(virtual_geom_node)
 
