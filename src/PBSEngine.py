@@ -68,11 +68,34 @@ def register():
     # properties_render.RENDER_PT_render.COMPAT_ENGINES.add('PBSEngine')
     # del properties_render
 
+    from bl_ui import properties_render
+    properties_render.RENDER_PT_bake.COMPAT_ENGINES.add('P3DPBS')
+
+    from bl_ui import properties_scene
+    properties_scene.SCENE_PT_unit.COMPAT_ENGINES.add('P3DPBS')
+
+    from bl_ui import properties_data_mesh
+    properties_data_mesh.DATA_PT_context_mesh.COMPAT_ENGINES.add('P3DPBS')
+
     from bl_ui import properties_material
-    #properties_material.MATERIAL_PT_context_material.COMPAT_ENGINES.add('P3DPBS')
+    properties_material.MATERIAL_PT_context_material.COMPAT_ENGINES.add('P3DPBS')
     properties_material.MATERIAL_PT_preview.COMPAT_ENGINES.add('P3DPBS')
     properties_material.MATERIAL_PT_game_settings.COMPAT_ENGINES.add('P3DPBS')
-    del properties_material
+
+    from bl_ui import properties_texture
+    properties_texture.TEXTURE_PT_context_texture.COMPAT_ENGINES.add('P3DPBS')
+    properties_texture.TEXTURE_PT_image.COMPAT_ENGINES.add('P3DPBS')
+    properties_texture.TEXTURE_PT_image_sampling.COMPAT_ENGINES.add('P3DPBS')
+    properties_texture.TEXTURE_PT_image_mapping.COMPAT_ENGINES.add('P3DPBS')
+    properties_texture.TEXTURE_PT_mapping.COMPAT_ENGINES.add('P3DPBS')
+
+    from bl_ui import properties_game
+    properties_game.OBJECT_PT_levels_of_detail.COMPAT_ENGINES.add('P3DPBS')
+
+    from bl_ui import properties_particle
+    properties_particle.PARTICLE_PT_context_particles.COMPAT_ENGINES.add('P3DPBS')
+    properties_particle.PARTICLE_PT_emission.COMPAT_ENGINES.add('P3DPBS')
+    properties_particle.PARTICLE_PT_render.COMPAT_ENGINES.add('P3DPBS')
 
 def unregister():
     bpy.utils.unregister_class(PBSEngine)
