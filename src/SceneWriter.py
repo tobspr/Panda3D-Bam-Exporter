@@ -2,6 +2,7 @@
 import os
 import bpy
 import time
+import math
 import mathutils
 from ExportException import ExportException
 from TextureWriter import TextureWriter
@@ -151,6 +152,7 @@ class SceneWriter:
         self._set_tags(obj, node)
 
         self._check_dupli(obj, node)
+        self._check_billboard(obj, node)
 
     def _handle_object_data(self, obj, parent):
         """ Internal method to process an object datablock """
@@ -185,6 +187,29 @@ class SceneWriter:
                 print("Exporting duplicated object:", sub_obj.name, "for parent", obj.name)
                 self._handle_object(sub_obj, parent)
             return
+
+    def _check_billboard(self, obj, node):
+        """ Checks for a billboard """
+        if not obj.active_material or not obj.active_material.game_settings:
+            return
+
+        orient = obj.active_material.game_settings.face_orientation
+        if orient not in ('HALO', 'BILLBOARD'):
+            return
+
+        # Extract the rotation from the transform.  We do need to rotate it
+        # by 90 degrees since Blender makes it look in the X axis, Panda in Y.
+        loc, rot, scale = obj.matrix_world.decompose()
+        node.transform.mat = mathutils.Matrix.Translation(loc) \
+                           * mathutils.Matrix(((0, scale[1], 0, 0),
+                                               (-scale[0], 0, 0, 0),
+                                               (0, 0, scale[2], 0),
+                                               (0, 0, 0, 1)))
+
+        if orient == 'HALO':
+            node.effects = RenderEffects.billboard_point_eye
+        elif orient == 'BILLBOARD':
+            node.effects = RenderEffects.billboard_axis
 
     def _set_tags(self, obj, panda_node):
         """ Reads all game object tags from the given object handle and applies
@@ -276,6 +301,28 @@ class SceneWriter:
 
             if has_any_transform:
                 virtual_state.attributes.append(tex_mat_attrib)
+
+        # Check for game settings.
+        if material.game_settings:
+            if not material.game_settings.use_backface_culling:
+                virtual_state.attributes.append(CullFaceAttrib.cull_none)
+
+            mode = material.game_settings.alpha_blend
+            attrib = None
+
+            if mode == 'OPAQUE':
+                attrib = TransparencyAttrib.none
+            elif mode == 'ADD':
+                attrib = ColorBlendAttrib.add
+            elif mode == 'CLIP':
+                attrib = TransparencyAttrib.binary
+            elif mode == 'ALPHA':
+                attrib = TransparencyAttrib.alpha
+            elif mode == 'ALPHA_ANTIALIASING':
+                attrib = TransparencyAttrib.multisample_mask
+
+            if attrib:
+                virtual_state.attributes.append(attrib)
 
         self.material_state_cache[material.name] = virtual_state
 

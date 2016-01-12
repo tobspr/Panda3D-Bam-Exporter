@@ -69,7 +69,9 @@ def register():
     # del properties_render
 
     from bl_ui import properties_material
+    #properties_material.MATERIAL_PT_context_material.COMPAT_ENGINES.add('P3DPBS')
     properties_material.MATERIAL_PT_preview.COMPAT_ENGINES.add('P3DPBS')
+    properties_material.MATERIAL_PT_game_settings.COMPAT_ENGINES.add('P3DPBS')
     del properties_material
 
 def unregister():
