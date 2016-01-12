@@ -1,6 +1,7 @@
 
 import bpy
 import math
+from bl_ui.properties_game import OBJECT_PT_levels_of_detail
 
 from os.path import join, dirname, abspath
 
@@ -166,8 +167,12 @@ def register():
 
     bpy.types.Material.pbepbs = bpy.props.PointerProperty(type=PBSMatProps)
 
+    OBJECT_PT_levels_of_detail.COMPAT_ENGINES.add('P3DPBS')
+
 def unregister():
     del bpy.types.Material.pbepbs
     bpy.utils.unregister_class(OperatorSetDefaultTextures)
     bpy.utils.unregister_class(PBSMatProps)
     bpy.utils.unregister_class(PBSMaterial)
+
+    OBJECT_PT_levels_of_detail.COMPAT_ENGINES.remove('P3DPBS')
