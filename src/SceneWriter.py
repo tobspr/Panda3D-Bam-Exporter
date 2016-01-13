@@ -302,9 +302,19 @@ class SceneWriter:
             if has_any_transform:
                 virtual_state.attributes.append(tex_mat_attrib)
 
+        # Handle material type.
+        if material.type == 'WIRE':
+            virtual_state.attributes.append(RenderModeAttrib.wireframe)
+
+        elif material.type == 'HALO':
+            attrib = RenderModeAttrib(RenderModeAttrib.M_point)
+            attrib.thickness = material.halo.size
+            attrib.perspective = True
+            virtual_state.attributes.append(attrib)
+
         # Check for game settings.
         if material.game_settings:
-            if not material.game_settings.use_backface_culling:
+            if material.type in ('WIRE', 'HALO') or not material.game_settings.use_backface_culling:
                 virtual_state.attributes.append(CullFaceAttrib.cull_none)
 
             mode = material.game_settings.alpha_blend
