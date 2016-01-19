@@ -264,7 +264,6 @@ class SceneWriter:
             virtual_material.metallic = 1.0 if material.pbepbs.metallic else 0.0
             virtual_material.roughness = material.pbepbs.roughness
             virtual_material.refractive_index = material.pbepbs.ior
-            print("Writing roughness:", material.pbepbs.roughness)
             virtual_material.emission = (
                 material.pbepbs.normal_strength,
                 0.0,
