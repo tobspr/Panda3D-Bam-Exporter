@@ -52,7 +52,7 @@ class ExportOperator(bpy.types.Operator, ExportHelper):
     """ This class is the main export operator, being called whenever the user
     wants to export the model """
 
-    bl_idname = "export.panda3d_bam"  
+    bl_idname = "export.panda3d_bam"
     bl_label = "Export to Panda3D BAM"
 
     filename_ext = ".bam"
@@ -65,7 +65,7 @@ class ExportOperator(bpy.types.Operator, ExportHelper):
         """ This function is called when the operator is executed. It starts the
         export process """
 
-        objects = bpy.context.selected_objects 
+        objects = bpy.context.selected_objects
         scene = bpy.context.scene
 
         # Check if there exists a settings datablock
@@ -79,7 +79,7 @@ class ExportOperator(bpy.types.Operator, ExportHelper):
             return {'CANCELLED'}
 
         # Try to execute the export process
-        try:    
+        try:
             writer = SceneWriter()
             writer.set_context(bpy.context)
             writer.set_settings(scene.pbe)
@@ -91,12 +91,12 @@ class ExportOperator(bpy.types.Operator, ExportHelper):
             return {'CANCELLED'}
 
         return {'FINISHED'}
-        
+
     def draw(self, context):
         """ This function is called when the export-screen is drawn. We draw
         our properties here so the user can adjust it """
         context.scene.pbe.draw(self.layout)
-        
+
 def PBEExportFuncCallback(self, context):
     self.layout.operator(ExportOperator.bl_idname, text="Panda3D (.bam)")
 

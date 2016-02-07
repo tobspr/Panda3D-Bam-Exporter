@@ -29,7 +29,7 @@ class GeometryWriter:
         return polygons
 
     def _create_default_array_formats(self):
-        """ Creates the default GeomVertexArrayFormats, so we do not have to 
+        """ Creates the default GeomVertexArrayFormats, so we do not have to
         recreate them for every geom  """
         self.gvd_formats = {}
 
@@ -60,7 +60,7 @@ class GeometryWriter:
         self.gvd_formats['index16'].stride = 2
         self.gvd_formats['index16'].total_bytes = self.gvd_formats['index16'].stride
         self.gvd_formats['index16'].pad_to = 1
-        self.gvd_formats['index16'].add_column("index", 1, GeomEnums.NT_uint16, 
+        self.gvd_formats['index16'].add_column("index", 1, GeomEnums.NT_uint16,
             GeomEnums.C_index, start = 0, column_alignment = 1)
 
         # Vertex index format, using 32 bit indices, used for geoms with more than
@@ -69,7 +69,7 @@ class GeometryWriter:
         self.gvd_formats['index32'].stride = 4
         self.gvd_formats['index32'].total_bytes = self.gvd_formats['index32'].stride
         self.gvd_formats['index32'].pad_to = 1
-        self.gvd_formats['index32'].add_column("index", 1, GeomEnums.NT_uint32, 
+        self.gvd_formats['index32'].add_column("index", 1, GeomEnums.NT_uint32,
             GeomEnums.C_index, start = 0, column_alignment = 1)
 
 
@@ -77,7 +77,7 @@ class GeometryWriter:
         """ Creates a Geom from a set of polygons. If uv_coordinates is not None,
         texcoords will be written as well """
 
-        # Compute the maximum possible amount of vertices for this geom. If it 
+        # Compute the maximum possible amount of vertices for this geom. If it
         # extends the range of 16 bit, we have to use 32 bit indices
         use_32_bit_indices = False
         max_possible_vtx_count = len(polygons) * 3
@@ -105,7 +105,7 @@ class GeometryWriter:
 
         vertex_buffer = array('f')
 
-        # Store the location of each mesh vertex 
+        # Store the location of each mesh vertex
         vertex_mappings = [-1 for i in range(len(vertices))]
         vertex_uvs = [0.0 for i in range(len(vertices))]
 
@@ -208,7 +208,7 @@ class GeometryWriter:
         triangles.vertices = index_array_data
         triangles.first_vertex = 0
 
-        # Make sure to set the correct index type on the primitive, otherwise 
+        # Make sure to set the correct index type on the primitive, otherwise
         # it will assume 16 bit indices
         if use_32_bit_indices:
             triangles.index_type = GeomEnums.NT_uint32
@@ -247,10 +247,10 @@ class GeometryWriter:
             virtual_geom_node = GeomNode(obj.data.name)
 
             # Convert the object to a mesh, so we can read the polygons
-            mesh = obj.to_mesh(self.writer.context.scene, 
-                apply_modifiers = True, 
-                settings = 'PREVIEW', 
-                calc_tessface = True, 
+            mesh = obj.to_mesh(self.writer.context.scene,
+                apply_modifiers = True,
+                settings = 'PREVIEW',
+                calc_tessface = True,
                 calc_undeformed = True)
 
             # Get a BMesh representation
@@ -261,7 +261,7 @@ class GeometryWriter:
             # polygons with more than 3 vertices.
             bmesh.ops.triangulate(b_mesh, faces=b_mesh.faces)
 
-            # Copy the bmesh back to the original mesh 
+            # Copy the bmesh back to the original mesh
             b_mesh.to_mesh(mesh)
 
             # Find the active uv layer and its name, in case there is one.
@@ -272,7 +272,7 @@ class GeometryWriter:
                 active_uv_layer = None
                 active_uv_name = ""
 
-            # Group the polygons by their material index. We have to perform this 
+            # Group the polygons by their material index. We have to perform this
             # operation, because we have to create a single geom for each material
             polygons_by_material = self._group_mesh_faces_by_material(mesh)
 

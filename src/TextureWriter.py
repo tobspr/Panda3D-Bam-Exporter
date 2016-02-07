@@ -80,10 +80,10 @@ class TextureWriter(object):
     def _create_sampler_state_from_texture_slot(self, texture_slot):
         """ Creates a sampler state from a given texture slot """
         state = SamplerState()
-        
+
         tex_handle = texture_slot.texture
-        if tex_handle:            
-            
+        if tex_handle:
+
             # Process texture settings
 
             # Mipmapping
@@ -149,15 +149,15 @@ class TextureWriter(object):
                 abs_filename = self._save_image(image)
                 rel_filename = bpy.path.relpath(abs_filename, start=current_dir)
                 texture.filename = convert_to_panda_filepath(rel_filename)
-            
+
             # Otherwise just convert the filename
             else:
                 src = bpy.path.abspath(image.filepath)
                 rel_src = bpy.path.relpath(src, start=current_dir)
                 texture.filename = convert_to_panda_filepath(rel_src)
-                        
+
         elif mode == "COPY":
-            
+
             # When copying textures, we just write all textures to disk
             abs_filename = self._save_image(image)
             rel_filename = bpy.path.relpath(abs_filename, start=current_dir)
@@ -173,7 +173,7 @@ class TextureWriter(object):
         return texture
 
     def create_stage_node_from_texture_slot(self, texture_slot, sort=0):
-        """ Creates a panda texture object from a blender texture object """ 
+        """ Creates a panda texture object from a blender texture object """
 
         # Check if the slot is not empty and a texture is assigned
         if not texture_slot or not texture_slot.texture or texture_slot.texture.type == "NONE":
@@ -219,7 +219,7 @@ class TextureWriter(object):
                 return None
             stage_node.texture.default_sampler = stage_node.sampler
 
-        elif texture.type in ["BLEND", "CLOUDS", "DISTORTED_NOISE", "ENVIRONMENT_MAP", 
+        elif texture.type in ["BLEND", "CLOUDS", "DISTORTED_NOISE", "ENVIRONMENT_MAP",
             "MAGIC", "MARBLE", "MUSGRAVE", "NOISE", "OCEAN", "POINT_DENSITY",
             "STUCCI", "VORONOI", "VOXEL_DATA", "WOOD"]:
             print("TODO: Handle generated image")

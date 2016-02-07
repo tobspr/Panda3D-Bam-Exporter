@@ -2,7 +2,7 @@
 
 class ExportException(Exception):
 
-    """ This exception is thrown whenever an error occurs during the export 
+    """ This exception is thrown whenever an error occurs during the export
     process. This way we can propagate them easily through the hierarchy, without
     having to check the return status of each function """
 

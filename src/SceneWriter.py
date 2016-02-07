@@ -14,7 +14,7 @@ from pybamwriter.bam_writer import BamWriter
 class SceneWriter:
 
     """ This class handles the conversion from the blender scene graph to the
-    virtual scene graph, to be able to export that converted scene graph to a 
+    virtual scene graph, to be able to export that converted scene graph to a
     bam file. """
 
     def __init__(self):
@@ -50,7 +50,7 @@ class SceneWriter:
     def write_bam_file(self):
         """ Writes out the bam file, convertin the scene to a virtual scene graph
         first, and then exporting that to a bam file """
-        
+
         # Make the output easier to read - just for debugging
         # os.system("cls")
         start_time = time.time()
@@ -77,7 +77,7 @@ class SceneWriter:
 
         if self._stats_duplicated_vertices:
             print("Had to duplicate", format(self._stats_duplicated_vertices, ",d"), "Vertices due to different texture coordinates.")
-        
+
         print("Exported", len(self.material_state_cache.keys()), "materials")
         print("Exported", len(self.texture_writer.textures_cache.keys()), "texture slots, using", len(self.texture_writer.images_cache.keys()), "images")
         print("-" * 79)
@@ -236,7 +236,7 @@ class SceneWriter:
 
         if not self.settings.use_pbs:
             virtual_material.diffuse = (
-                material.diffuse_color[0] * material.diffuse_intensity, 
+                material.diffuse_color[0] * material.diffuse_intensity,
                 material.diffuse_color[1] * material.diffuse_intensity,
                 material.diffuse_color[2] * material.diffuse_intensity,
                 material.alpha)

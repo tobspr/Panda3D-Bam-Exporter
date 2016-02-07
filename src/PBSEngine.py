@@ -23,7 +23,7 @@ class PBSEngine(bpy.types.RenderEngine):
         scale = scene.render.resolution_percentage / 100.0
         self.size_x = int(scene.render.resolution_x * scale)
         self.size_y = int(scene.render.resolution_y * scale)
-        
+
         # Load a temporary loading screen
         result = self.begin_result(0, 0, self.size_x, self.size_y)
         result.layers[0].load_from_file(loading, 0, 0)
@@ -37,7 +37,7 @@ class PBSEngine(bpy.types.RenderEngine):
                 objects.append(obj_handle)
 
         # Export the scene as .bam file
-        try:    
+        try:
             writer = SceneWriter()
             writer.set_context(bpy.context)
             writer.set_settings(scene.pbe)

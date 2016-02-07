@@ -127,9 +127,9 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
                 continue
 
             slot = material.texture_slots.create(index)
-            texname = "Empty" + slot_name 
+            texname = "Empty" + slot_name
             default_pth = join(dirname(__file__), "../res/" + texname + ".png")
-                
+
             image = None
             for img in bpy.data.images:
                 if img.filepath == default_pth:
