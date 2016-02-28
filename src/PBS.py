@@ -120,14 +120,14 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
         print("Executing default texture operator")
         material = context.material
 
-        for index, slot_name in enumerate(["BaseColor", "Normal", "Specular", "Roughness"]):
+        for index, slot_name in enumerate(["basecolor", "normal", "specular", "roughness"]):
             slot = material.texture_slots[index]
             if slot is not None and slot.texture is not None:
                 print("Skipping used slot #", index)
                 continue
 
             slot = material.texture_slots.create(index)
-            texname = "Empty" + slot_name
+            texname = "empty_" + slot_name
             default_pth = join(dirname(__file__), "../res/" + texname + ".png")
 
             image = None

@@ -276,7 +276,8 @@ class SceneWriter:
         # Iterate over the texture slots and extract the stage nodes
         stage_nodes = []
         for idx, tex_slot in enumerate(material.texture_slots):
-            stage_node = self.texture_writer.create_stage_node_from_texture_slot(tex_slot, sort=idx*10)
+            use_srgb = idx == 0
+            stage_node = self.texture_writer.create_stage_node_from_texture_slot(tex_slot, sort=idx*10, use_srgb=use_srgb)
             if stage_node:
                 stage_nodes.append(stage_node)
 

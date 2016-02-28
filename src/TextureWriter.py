@@ -126,6 +126,17 @@ class TextureWriter(object):
 
         mode = str(self.writer.settings.tex_mode)
         texture = Texture(image.name)
+
+        if image.depth == 8:
+            texture.num_components = 1
+        # No case for 16bits, could be one or two channel
+        elif image.depth == 24:
+            texture.num_components = 3
+        elif image.depth == 32:
+            texture.num_components = 4
+        else:
+            print("WARNING: Cannot determine component count of", image.name, ", assuming 3")
+            texture.num_components = 3
         is_packed = image.packed_file is not None
         current_dir = os.path.dirname(self.writer.filepath)
 
@@ -172,7 +183,7 @@ class TextureWriter(object):
 
         return texture
 
-    def create_stage_node_from_texture_slot(self, texture_slot, sort=0):
+    def create_stage_node_from_texture_slot(self, texture_slot, sort=0, use_srgb=False):
         """ Creates a panda texture object from a blender texture object """
 
         # Check if the slot is not empty and a texture is assigned
@@ -186,7 +197,7 @@ class TextureWriter(object):
 
         # Check if the texture slot mode is supported
         if texture_slot.texture_coords != "UV":
-            # raise ExportException("Unsupported texture coordinate mode for slot '" + texture_slot.name + "': " + texture_slot.texture_coords)
+            print("Unsupported texture coordinate mode for slot '" + texture_slot.name + "': " + texture_slot.texture_coords)
             return None
 
         # Create sampler state
@@ -223,13 +234,21 @@ class TextureWriter(object):
             "MAGIC", "MARBLE", "MUSGRAVE", "NOISE", "OCEAN", "POINT_DENSITY",
             "STUCCI", "VORONOI", "VOXEL_DATA", "WOOD"]:
             print("TODO: Handle generated image")
-
-
-
             return None
 
         else:
             raise ExportException("Unsupported texture type for texture '" + texture.name + "': " + texture.type)
+
+        formats = [None, Texture.F_luminance, Texture.F_luminance_alpha, Texture.F_rgb, Texture.F_rgba]
+        stage_node.texture.format = formats[stage_node.texture.num_components]
+
+        if use_srgb:
+            if stage_node.texture.num_components == 3:
+                stage_node.texture.format = Texture.F_srgb
+            elif stage_node.texture.num_components == 4:
+                stage_node.texture.format = Texture.F_srgb_alpha
+            else:
+                print("WARNING: Cannot set srgb on less than 3 channel texture:", stage_node.texture.name)
 
         self.textures_cache[texture_slot.name] = stage_node
         return stage_node
