@@ -88,7 +88,19 @@ class SceneWriter:
 
     def _handle_light(self, obj, parent):
         """ Internal method to handle a light """
-        pass
+        print("Exporting light", obj.name)
+        light_node = PointLight(obj.name)
+        light_node.color = list(obj.data.color) + [1]
+        light_node.specular_color = light_node.color
+        light_node.shadow_caster = obj.data.use_shadow
+        light_node.sb_xsize = int(obj.data.pbepbs.shadow_map_res)
+        light_node.sb_ysize = light_node.sb_ysize
+        light_node.attenuation = (0, 0, 1)
+        light_node.transform = TransformState()
+        light_node.transform.mat = obj.matrix_world
+        light_node.point = (
+            obj.matrix_world[0][3], obj.matrix_world[1][3], obj.matrix_world[2][3])
+        parent.add_child(light_node)
 
     def _handle_empty(self, obj, parent):
         """ Internal method to handle an empty object """

@@ -75,3 +75,4 @@ def register():
 def unregister():
     global pbe_loaded_module_list
     unload_modules()
+    pbe_loaded_module_list.clear()

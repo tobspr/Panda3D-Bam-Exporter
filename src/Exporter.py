@@ -109,7 +109,10 @@ def register():
     bpy.types.Scene.pbe = bpy.props.PointerProperty(type=ExportSettings)
 
 def unregister():
-    del bpy.types.Scene.pbe
+    try:
+        del bpy.types.Scene.pbe
+    except AttributeError:
+        pass
     bpy.utils.unregister_class(ExportSettings)
     bpy.utils.unregister_class(ExportOperator)
     bpy.types.INFO_MT_file_export.remove(PBEExportFuncCallback)

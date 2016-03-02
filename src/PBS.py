@@ -113,7 +113,6 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
     bl_idname = "pbepbs.set_default_textures"
     bl_label = "Fill default PBS textures"
 
-
     def execute(self, context):
         if not hasattr(context, "material"):
             return {'CANCELLED'}
@@ -133,11 +132,9 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
             image = None
             for img in bpy.data.images:
                 if img.filepath == default_pth:
-                    # print("FOUND IMG")
                     image = img
                     break
             else:
-                # print("LOAD IMG")
                 bpy.ops.image.open(filepath=default_pth, relative_path=False)
                 image = bpy.data.images[texname + ".png"]
                 print("IMAGE=", image)
@@ -159,15 +156,129 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class PBSDataPanel(bpy.types.Panel):
+
+    """ This is a panel to display the PBS properties of the currently
+    selected object """
+
+    bl_idname = "MATERIAL_PT_pbs_light_props"
+    bl_label = "Physically Based Shading Properties"
+    bl_space_type = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context = "data"
+
+    def draw(self, context):
+
+        if not context.object:
+            self.layout.label("No object selected")
+            return
+
+        obj = context.object
+
+        if obj.type == "LAMP":
+            if not hasattr(obj.data, "pbepbs"):
+                self.layout.label("Lamp has no PBS datablock")
+                return
+
+            obj_data = obj.data
+            pbs_data = obj_data.pbepbs
+
+            box = self.layout.box()
+            box.row().prop(obj.data, "type", "Light type")
+
+            if obj.data.type not in ("POINT", "SPOT"):
+                box.row().label("Type not supported yet!")
+                return
+
+            box.row().prop(obj.data, "color", "Color")
+            box.row().prop(obj.data, "distance", "Radius")
+            box.row().prop(obj.data, "energy", "Brightness")
+
+            box.row().prop(obj.data, "use_shadow", "Enable Shadows")
+
+            if obj.data.use_shadow:
+                box.row().prop(pbs_data, "shadow_map_res")
+
+                if int(pbs_data.shadow_map_res) > 512:
+                    box.row().label("WARNING: Very high shadow map resolution!")
+
+            if obj.data.type == "SPOT":
+                box.row().prop(obj.data, "spot_size")
+
+        # self.layout.label("TEST1:" +  context.object.name)
+        # self.layout.label("TEST2:" +  context.object.data.name)
+        # self.layout.label("TEST2:" +  context.object.type)
+        # if not hasattr(context.material, "pbepbs"):
+        #     self.layout.label("No PBS datablock")
+        #     return
+
+        # box = self.layout.box()
+        # box.row().prop(context.material, "diffuse_color", "Base Color")
+
+        # box.row().prop(context.material.pbepbs, "metallic")
+        # box.row().prop(context.material.pbepbs, "roughness")
+
+        # if not context.material.pbepbs.metallic:
+        #     box.row().prop(context.material.pbepbs, "ior")
+
+        # box.row().prop(context.material.pbepbs, "normal_strength")
+        # box.row()
+
+        # self.layout.separator()
+
+        # box = self.layout.box()
+        # box.label("Special properties")
+        # box.row().prop(context.material.pbepbs, "emissive_factor")
+        # box.row().prop(context.material.pbepbs, "translucency")
+        # box.row().prop(context.material, "alpha", "Transparency")
+        # box.row()
+        # # self.layout.separator()
+
+        # self.layout.label("Operators:")
+        # self.layout.row().operator("pbepbs.set_default_textures")
+
+        # self.layout.separator()
+
+
+class PBSLampProps(bpy.types.PropertyGroup):
+
+    """ This is the property group which stores the PBS properties of each
+    lamp """
+
+    def update_shadow_resolution(self, context):
+        if context.object:
+            context.object.data.shadow_buffer_size = int(context.object.data.pbepbs.shadow_map_res)
+
+
+
+    shadow_map_res = bpy.props.EnumProperty(
+        name="Shadow Resolution",
+        description="Resolution of the shadow map in pixels",
+        items=(
+            ("128", "128 px", "128 Pixel Resolution"),
+            ("256", "256 px", "256 Pixel Resolution"),
+            ("512", "512 px", "512 Pixel Resolution"),
+            ("1024", "1024 px", "1024 Pixel Resolution"),
+            ("2048", "2048 px", "2048 Pixel Resolution")
+        ),
+        default="128",
+        update=update_shadow_resolution)
+
+
 def register():
     bpy.utils.register_class(OperatorSetDefaultTextures)
     bpy.utils.register_class(PBSMatProps)
+    bpy.utils.register_class(PBSLampProps)
     bpy.utils.register_class(PBSMaterial)
+    bpy.utils.register_class(PBSDataPanel)
 
     bpy.types.Material.pbepbs = bpy.props.PointerProperty(type=PBSMatProps)
+    bpy.types.Lamp.pbepbs = bpy.props.PointerProperty(type=PBSLampProps)
 
 def unregister():
     del bpy.types.Material.pbepbs
     bpy.utils.unregister_class(OperatorSetDefaultTextures)
     bpy.utils.unregister_class(PBSMatProps)
+    bpy.utils.unregister_class(PBSLampProps)
     bpy.utils.unregister_class(PBSMaterial)
+    bpy.utils.unregister_class(PBSDataPanel)
