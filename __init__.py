@@ -17,27 +17,7 @@ import sys
 import bpy
 import importlib
 from types import ModuleType
-# from bpy.props import *
 
-
-# Check if we already imported the libraries
-# if "SceneWriter" not in locals():
-
-#     # Add the current path to the sys path. This ensures we can load the modules 
-#     # from the current directory
-#     plugin_dir = os.path.dirname(os.path.abspath(__file__))
-#     sys.path.insert(0, plugin_dir)
-
-#     # Now import the required libs
-#     import src.ExportException as ExportException
-#     import src.SceneWriter as SceneWriter
-#     import src.PBS as PBS
-
-# else:
-#     # If we already imported the libs, just reload them (but don't modify the path again)
-#     importlib.reload(ExportException)
-#     importlib.reload(SceneWriter)
-#     importlib.reload(PBS)
 
 plugin_dir = os.path.dirname(os.path.abspath(__file__))
 source_dir = os.path.join(plugin_dir, "src")

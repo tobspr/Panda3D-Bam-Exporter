@@ -35,10 +35,24 @@ class ExportSettings(bpy.types.PropertyGroup):
             default=True
         )
 
+    bam_version = bpy.props.EnumProperty(
+        name="Bam Version",
+        description="Bam version to write out",
+        items=(
+            ('6.14', '6.14 (Panda3D 1.5.x / 1.6.x)', 'Writes bams for 1.5.x and (1.6.x'),
+            ('6.22', '6.22 (Panda3D 1.7.0)', 'Writes bams for 1.7.0'),
+            ('6.24', '6.24 (Panda3D 1.7.1 / 1.7.2)', 'Writes bams for 1.7.1 and 1.7.2'),
+            ('6.30', '6.30 (Panda3D 1.8.x)', 'Writes bams for 1.8.x'),
+            ('6.37', '6.37 (Panda3D 1.9.x)', 'Writes bams for 1.9.x'),
+            ('6.41', '6.41 (Panda3D DEVEL)', 'Writes bams for the devel version (1.10)'),
+        ),
+        default='6.37')
+
     def draw(self, layout):
         """ This function is called by the PBEExportOperator, whenever the export-
         screen is rendered. We should draw all available export properties here """
 
+        layout.row().prop(self, 'bam_version')
         layout.row().prop(self, 'tex_mode')
 
         if self.tex_mode == "COPY":

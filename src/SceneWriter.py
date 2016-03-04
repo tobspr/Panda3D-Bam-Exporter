@@ -63,6 +63,7 @@ class SceneWriter:
             self._handle_object(obj, virtual_model_root)
 
         writer = BamWriter()
+        writer.file_version = tuple(int(i) for i in self.settings.bam_version.split("."))
         writer.open_file(self.filepath)
         writer.write_object(virtual_model_root)
         writer.close()
@@ -71,6 +72,7 @@ class SceneWriter:
         duration = round(end_time - start_time, 4)
 
         print("-" * 79)
+        print("Wrote out bam with the version", writer.file_version)
         print("Export finished in", duration, "seconds.")
         print("Exported", format(self._stats_exported_vertices, ",d"), "Vertices and", format(self._stats_exported_tris, ",d"), "Triangles")
         print("Exported", self._stats_exported_objs, "Objects and", self._stats_exported_geoms, "Geoms")
@@ -88,7 +90,7 @@ class SceneWriter:
 
     def _handle_light(self, obj, parent):
         """ Internal method to handle a light """
-        print("Exporting light", obj.name)
+        print("Exporting point light", obj.name)
         light_node = PointLight(obj.name)
         light_node.color = list(obj.data.color) + [1]
         light_node.specular_color = light_node.color
@@ -100,6 +102,7 @@ class SceneWriter:
         light_node.transform.mat = obj.matrix_world
         light_node.point = (
             obj.matrix_world[0][3], obj.matrix_world[1][3], obj.matrix_world[2][3])
+        light_node.max_distance = obj.data.distance
         parent.add_child(light_node)
 
     def _handle_empty(self, obj, parent):
