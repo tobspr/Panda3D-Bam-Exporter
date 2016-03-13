@@ -229,13 +229,13 @@ class GeometryWriter:
         return geom
 
 
-    def write_mesh(self, obj, parent, custom_transform=None):
+    def write_mesh(self, obj, parent):
         """ Internal method to process a mesh during the export process """
 
         for modifier in obj.modifiers:
             if modifier.type == "PARTICLE_SYSTEM":
                 particle_system = modifier.particle_system
-                self.writer.handle_particle_system(obj, particle_system)
+                self.writer.handle_particle_system(obj, parent, particle_system)
 
         # Check if we alrady have the geom node cached
         if obj.data.name in self.geom_cache:
@@ -279,8 +279,6 @@ class GeometryWriter:
             # Calculate the per-vertex normals, in case blender did not do that yet.
             mesh.calc_normals()
 
-
-
             # Extract material slots, but ensure there is always one slot, so objects
             # with no actual material get exported, too
             material_slots = obj.material_slots
@@ -298,7 +296,7 @@ class GeometryWriter:
                 # Create a virtual material if the slot contains a material. Otherwise
                 # just use an empty material
                 if slot and slot.material:
-                    render_state = self.writer._create_state_from_material(slot.material)
+                    render_state = self.writer.material_writer.create_state_from_material(slot.material)
                 else:
                     render_state = RenderState.empty
 

@@ -7,6 +7,7 @@ import mathutils
 from ExportException import ExportException
 from TextureWriter import TextureWriter
 from GeometryWriter import GeometryWriter
+from MaterialWriter import MaterialWriter
 
 from pybamwriter.panda_types import *
 from pybamwriter.bam_writer import BamWriter
@@ -24,9 +25,9 @@ class SceneWriter:
         self._stats_exported_objs = 0
         self._stats_exported_geoms = 0
         self._stats_duplicated_vertices = 0
-        self.material_state_cache = {}
         self.texture_writer = TextureWriter(self)
         self.geometry_writer = GeometryWriter(self)
+        self.material_writer = MaterialWriter(self)
 
     def set_filepath(self, filepath):
         """ Sets the filepath used to store the bam file. In future, the writer
@@ -80,7 +81,7 @@ class SceneWriter:
         if self._stats_duplicated_vertices:
             print("Had to duplicate", format(self._stats_duplicated_vertices, ",d"), "Vertices due to different texture coordinates.")
 
-        print("Exported", len(self.material_state_cache.keys()), "materials")
+        print("Exported", len(self.material_writer.material_state_cache.keys()), "materials")
         print("Exported", len(self.texture_writer.textures_cache.keys()), "texture slots, using", len(self.texture_writer.images_cache.keys()), "images")
         print("-" * 79)
 
@@ -91,19 +92,29 @@ class SceneWriter:
     def _handle_light(self, obj, parent):
         """ Internal method to handle a light """
         print("Exporting point light", obj.name)
-        light_node = PointLight(obj.name)
-        light_node.color = list(obj.data.color) + [1]
+        if obj.data.type == "POINT":
+            light_node = PointLight(obj.name)
+
+        elif obj.data.type == "SPOT":
+            light_node = Spotlight(obj.name)
+            light_node.exponent = obj.data.spot_size
+        else:
+            print("TODO: Support other light types")
+            return
+
+        color = obj.data.color
+        if obj.data.pbepbs.use_temperature:
+            color = obj.data.pbepbs.color_preview
+
+        light_node.color = list(color) + [obj.data.energy]
         light_node.specular_color = light_node.color
         light_node.shadow_caster = obj.data.use_shadow
         light_node.sb_xsize = int(obj.data.pbepbs.shadow_map_res)
         light_node.sb_ysize = light_node.sb_ysize
         light_node.attenuation = (0, 0, 1)
-        light_node.transform = TransformState()
-        light_node.transform.mat = obj.matrix_world
-        light_node.point = (
-            obj.matrix_world[0][3], obj.matrix_world[1][3], obj.matrix_world[2][3])
         light_node.max_distance = obj.data.distance
         parent.add_child(light_node)
+
 
     def _handle_empty(self, obj, parent):
         """ Internal method to handle an empty object """
@@ -235,125 +246,7 @@ class SceneWriter:
             print("Writing tags", name, val)
             panda_node.tags[name] = val
 
-    def _create_state_from_material(self, material):
-        """ Creates a render state based on a material """
-
-        # Check if we already created this material
-        if material.name in self.material_state_cache:
-            return self.material_state_cache[material.name]
-
-        # Create the render and material state
-        virtual_state = RenderState()
-        virtual_material = Material()
-
-        # Extract the material properties:
-        # In case we use PBS, encode its properties in a special way
-
-        if not self.settings.use_pbs:
-            virtual_material.diffuse = (
-                material.diffuse_color[0] * material.diffuse_intensity,
-                material.diffuse_color[1] * material.diffuse_intensity,
-                material.diffuse_color[2] * material.diffuse_intensity,
-                material.alpha)
-            virtual_material.ambient = (
-                material.ambient,
-                material.ambient,
-                material.ambient,
-                1.0)
-            virtual_material.specular = (
-                material.specular_color[0] * material.specular_intensity,
-                material.specular_color[1] * material.specular_intensity,
-                material.specular_color[2] * material.specular_intensity,
-                material.specular_alpha)
-            virtual_material.emission = (
-                material.emit * material.diffuse_color[0] * material.diffuse_intensity,
-                material.emit * material.diffuse_color[1] * material.diffuse_intensity,
-                material.emit * material.diffuse_color[2] * material.diffuse_intensity,
-                1.0)
-        else:
-            virtual_material.base_color = (
-                material.diffuse_color[0],
-                material.diffuse_color[1],
-                material.diffuse_color[2],
-                material.alpha)
-            virtual_material.metallic = 1.0 if material.pbepbs.metallic else 0.0
-            virtual_material.roughness = material.pbepbs.roughness
-            virtual_material.refractive_index = material.pbepbs.ior
-            virtual_material.emission = (
-                material.pbepbs.normal_strength,
-                0.0,
-                material.pbepbs.translucency,
-                material.pbepbs.emissive_factor)
-
-        # Attach the material attribute to the render state
-        virtual_state.attributes.append(MaterialAttrib(virtual_material))
-
-        # Iterate over the texture slots and extract the stage nodes
-        stage_nodes = []
-        for idx, tex_slot in enumerate(material.texture_slots):
-            use_srgb = idx == 0
-            stage_node = self.texture_writer.create_stage_node_from_texture_slot(tex_slot, sort=idx*10, use_srgb=use_srgb)
-            if stage_node:
-                stage_nodes.append(stage_node)
-
-        # Check if there is at least one texture, and if so, create a texture attrib
-        if len(stage_nodes) > 0:
-
-            texture_attrib = TextureAttrib()
-
-            has_any_transform = False
-            tex_mat_attrib = TexMatrixAttrib()
-
-            # Attach the stage to the texture attrib
-            for stage in stage_nodes:
-                texture_attrib.on_stage_nodes.append(stage)
-                tex_mat_attrib.add_stage(stage.stage, stage._pbe_uv_transform, 0)
-
-                if stage._pbe_uv_transform.scale != (1,1,1):
-                    has_any_transform = True
-
-            virtual_state.attributes.append(texture_attrib)
-
-            if has_any_transform:
-                virtual_state.attributes.append(tex_mat_attrib)
-
-        # Handle material type.
-        if material.type == 'WIRE':
-            virtual_state.attributes.append(RenderModeAttrib.wireframe)
-
-        elif material.type == 'HALO':
-            attrib = RenderModeAttrib(RenderModeAttrib.M_point)
-            attrib.thickness = material.halo.size
-            attrib.perspective = True
-            virtual_state.attributes.append(attrib)
-
-        # Check for game settings.
-        if material.game_settings:
-            if material.type in ('WIRE', 'HALO') or not material.game_settings.use_backface_culling:
-                virtual_state.attributes.append(CullFaceAttrib.cull_none)
-
-            mode = material.game_settings.alpha_blend
-            attrib = None
-
-            if mode == 'OPAQUE':
-                attrib = TransparencyAttrib.none
-            elif mode == 'ADD':
-                attrib = ColorBlendAttrib.add
-            elif mode == 'CLIP':
-                attrib = TransparencyAttrib.binary
-            elif mode == 'ALPHA':
-                attrib = TransparencyAttrib.alpha
-            elif mode == 'ALPHA_ANTIALIASING':
-                attrib = TransparencyAttrib.multisample_mask
-
-            if attrib:
-                virtual_state.attributes.append(attrib)
-
-        self.material_state_cache[material.name] = virtual_state
-
-        return virtual_state
-
-    def handle_particle_system(self, obj, particle_system):
+    def handle_particle_system(self, obj, parent, particle_system):
         """ Internal method to handle a particle system """
 
         if particle_system.settings.render_type != "OBJECT":
@@ -367,13 +260,17 @@ class SceneWriter:
             print("Skipping particle system", particle_system.name, "since it has no dupli-object assigned.")
             return
 
-        for particle in particle_system.particles:
+        parent_transform_inverse = obj.matrix_world.inverted()
+
+        for i, particle in enumerate(particle_system.particles):
             rotation = particle.rotation.to_matrix().to_4x4()
             location = mathutils.Matrix.Translation(particle.location)
             scale = mathutils.Matrix.Scale(particle.size, 3).to_4x4()
-            particle_mat = location * rotation * scale
-
-            panda_node = self.geometry_writer.write_mesh(duplicated_object, custom_transform=particle_mat)
-            self.virtual_model_root.add_child(panda_node)
+            particle_mat = parent_transform_inverse * (location * rotation * scale)
+            node = PandaNode("Particle-" + str(i))
+            node.transform = TransformState()
+            node.transform.mat = particle_mat
+            parent.add_child(node)
+            self.geometry_writer.write_mesh(duplicated_object, node)
 
         print("Wrote", len(particle_system.particles), "particles for system", particle_system.name)

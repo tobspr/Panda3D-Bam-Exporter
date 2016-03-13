@@ -90,11 +90,12 @@ class TextureWriter(object):
             if hasattr(tex_handle, "use_mipmap") and tex_handle.use_mipmap:
                 state.minfilter = SamplerState.FT_linear_mipmap_linear
             else:
-                state.minfilter = SamplerState.FT_linear
-            state.magfilter = SamplerState.FT_linear
+                if hasattr(tex_handle, "use_interpolation") and not tex_handle.use_interpolation:
+                    state.minfilter = SamplerState.FT_nearest
+                else:
+                    state.minfilter = SamplerState.FT_linear
 
-            # Override mipmap setting, is desired most of the time
-            state.minfilter = SamplerState.FT_linear_mipmap_linear
+            state.magfilter = SamplerState.FT_linear
 
             # Texture wrap modes
             wrap_modes = {

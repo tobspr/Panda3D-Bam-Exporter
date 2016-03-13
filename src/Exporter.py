@@ -46,7 +46,7 @@ class ExportSettings(bpy.types.PropertyGroup):
             ('6.37', '6.37 (Panda3D 1.9.x)', 'Writes bams for 1.9.x'),
             ('6.41', '6.41 (Panda3D DEVEL)', 'Writes bams for the devel version (1.10)'),
         ),
-        default='6.37')
+        default='6.41')
 
     def draw(self, layout):
         """ This function is called by the PBEExportOperator, whenever the export-
@@ -70,9 +70,6 @@ class ExportOperator(bpy.types.Operator, ExportHelper):
     bl_label = "Export to Panda3D BAM"
 
     filename_ext = ".bam"
-    # filter_glob = StringProperty(
-    #         default="*.bam",
-    #         )
     filepath = bpy.props.StringProperty()
 
     def execute(self, context):

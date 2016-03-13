@@ -30,8 +30,9 @@ def unload_modules():
     """ Unregisters all loaded modules """
     global pbe_loaded_module_list
     for module_name, module_handle in pbe_loaded_module_list.items():
-        print("Unregistering module", module_name)
+        print("Bam-Exporter: Unloading module", module_name)
         module_handle.unregister()
+        del sys.modules[module_name]
 
 def register():
     global pbe_loaded_module_list
@@ -42,14 +43,10 @@ def register():
     importlib.invalidate_caches()
 
     for mod_name in ["Exporter", "PBS", "PBSEngine"]:
-        if mod_name in pbe_loaded_module_list:
-            print("Reloading",mod_name, "..")
-            importlib.reload(pbe_loaded_module_list[mod_name])
-        else:
-            print("Loading",mod_name, "..")
-            mod = __import__(mod_name)
-            mod.register()
-            pbe_loaded_module_list[mod_name] = mod
+        print("Bam-Exporter: Loading",mod_name, "..")
+        mod = __import__(mod_name)
+        mod.register()
+        pbe_loaded_module_list[mod_name] = mod
 
 
 def unregister():

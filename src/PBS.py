@@ -1,6 +1,7 @@
 
 import bpy
 import math
+import mathutils
 
 from os.path import join, dirname, abspath
 
@@ -22,27 +23,38 @@ class PBSMaterial(bpy.types.Panel):
             self.layout.label("No PBS datablock")
             return
 
+        pbepbs = context.material.pbepbs
+
         box = self.layout.box()
+        box.row().prop(pbepbs, "shading_model")
         box.row().prop(context.material, "diffuse_color", "Base Color")
 
-        box.row().prop(context.material.pbepbs, "metallic")
-        box.row().prop(context.material.pbepbs, "roughness")
+        if pbepbs.shading_model != "EMISSIVE":
 
-        if not context.material.pbepbs.metallic:
-            box.row().prop(context.material.pbepbs, "ior")
+            if pbepbs.shading_model not in ("SKIN", "FOLIAGE", "CLEARCOAT"):
+                box.row().prop(pbepbs, "metallic")
 
-        box.row().prop(context.material.pbepbs, "normal_strength")
-        box.row()
+            if not pbepbs.metallic and  pbepbs.shading_model not in ("CLEARCOAT"):
+                    box.row().prop(pbepbs, "ior", "Index of Refraction")
+
+            box.row().prop(pbepbs, "roughness")
+
+
+            box.row().prop(pbepbs, "normal_strength")
+            box.row()
 
         self.layout.separator()
 
-        box = self.layout.box()
-        box.label("Special properties")
-        box.row().prop(context.material.pbepbs, "emissive_factor")
-        box.row().prop(context.material.pbepbs, "translucency")
-        box.row().prop(context.material, "alpha", "Transparency")
-        box.row()
-        # self.layout.separator()
+        if pbepbs.shading_model not in ("DEFAULT", "FOLIAGE", "CLEARCOAT", "SKIN"):
+            box = self.layout.box()
+            box.label("Shading model properties")
+            if pbepbs.shading_model == "EMISSIVE":
+                box.row().prop(pbepbs, "emissive_factor")
+            elif pbepbs.shading_model == "TRANSLUCENT":
+                box.row().prop(pbepbs, "translucency")
+            elif pbepbs.shading_model == "TRANSPARENT":
+                box.row().prop(context.material, "alpha", "Transparency")
+            box.row()
 
         self.layout.label("Operators:")
         self.layout.row().operator("pbepbs.set_default_textures")
@@ -67,6 +79,24 @@ class PBSMatProps(bpy.types.PropertyGroup):
             a = self.roughness * self.roughness
             context.material.specular_hardness = min(2 / (a * a) - 2, 511)
 
+    def update_specular(self, context):
+        f0 = (self.ior - 1) / (self.ior + 1)
+        f0 *= f0
+        context.material.specular_intensity = f0
+
+    shading_model = bpy.props.EnumProperty(
+        name="Shading Model",
+        description="The shading model to use",
+        items=(
+            ("DEFAULT", "Default", "Default shading model"),
+            ("EMISSIVE", "Emissive", "Emissive material"),
+            ("CLEARCOAT", "Clear Coat", "Clearcoat shading model e.g. for car paint"),
+            ("TRANSPARENT", "Transparent", "Transparent material"),
+            ("SKIN", "Skin", "Skin material"),
+            ("FOLIAGE", "Foliage (Vegetation)", "Two-Sided foliage"),
+        ),
+        default="DEFAULT"
+        )
 
     roughness = bpy.props.FloatProperty(
         name="Roughness",
@@ -77,10 +107,11 @@ class PBSMatProps(bpy.types.PropertyGroup):
         default=0.3, min=0.0, max=1.0)
 
     ior = bpy.props.FloatProperty(
-        name="IOR",
+        name="Index of Refraction",
         description="Index of refraction, usually 1.5 for most materials.",
         subtype="FACTOR",
-        default=1.5, min=1.0, max=2.7)
+        update=update_specular,
+        default=1.5, min=1.0, max=2.4)
 
     metallic = bpy.props.BoolProperty(
         name="Metallic",
@@ -92,7 +123,7 @@ class PBSMatProps(bpy.types.PropertyGroup):
         description="Values > 0.0 make the material emissive, receiving no shading "
                     "but emitting light with a color of the BaseColor instead",
         subtype="FACTOR",
-        default=0.0,min=0.0, max=20.0)
+        default=0.1, min=0.0, max=1.0)
 
     translucency = bpy.props.FloatProperty(
         name="Translucency",
@@ -122,7 +153,6 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
         for index, slot_name in enumerate(["basecolor", "normal", "specular", "roughness"]):
             slot = material.texture_slots[index]
             if slot is not None and slot.texture is not None:
-                print("Skipping used slot #", index)
                 continue
 
             slot = material.texture_slots.create(index)
@@ -137,7 +167,6 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
             else:
                 bpy.ops.image.open(filepath=default_pth, relative_path=False)
                 image = bpy.data.images[texname + ".png"]
-                print("IMAGE=", image)
 
             texture = None
             for tex in bpy.data.textures:
@@ -147,7 +176,6 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
             else:
                 texture = bpy.data.textures.new(texname, type="IMAGE")
 
-            print("Setting image:", image)
             texture.image = image
 
             slot.texture_coords = "UV"
@@ -155,6 +183,20 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class OperatorFixLampTypes(bpy.types.Operator):
+    """ Operator to set use_sphere on all lights """
+
+    bl_idname = "pbepbs.fix_lamp_types"
+    bl_label = "Fix PBS Lamp types"
+
+    def execute(self, context):
+
+        for lamp in bpy.data.lamps:
+            if lamp.type == "POINT":
+                lamp.use_sphere = True
+
+
+        return {'FINISHED'}
 
 class PBSDataPanel(bpy.types.Panel):
 
@@ -190,7 +232,15 @@ class PBSDataPanel(bpy.types.Panel):
                 box.row().label("Type not supported yet!")
                 return
 
-            box.row().prop(obj.data, "color", "Color")
+            box.row().prop(pbs_data, "use_temperature")
+
+            if pbs_data.use_temperature:
+                box.row().prop(pbs_data, "color_temperature")
+                box.row().prop(pbs_data, "color_preview")
+            else:
+                box.row().prop(obj.data, "color", "Color")
+
+
             box.row().prop(obj.data, "distance", "Radius")
             box.row().prop(obj.data, "energy", "Brightness")
 
@@ -205,39 +255,42 @@ class PBSDataPanel(bpy.types.Panel):
             if obj.data.type == "SPOT":
                 box.row().prop(obj.data, "spot_size")
 
-        # self.layout.label("TEST1:" +  context.object.name)
-        # self.layout.label("TEST2:" +  context.object.data.name)
-        # self.layout.label("TEST2:" +  context.object.type)
-        # if not hasattr(context.material, "pbepbs"):
-        #     self.layout.label("No PBS datablock")
-        #     return
 
-        # box = self.layout.box()
-        # box.row().prop(context.material, "diffuse_color", "Base Color")
 
-        # box.row().prop(context.material.pbepbs, "metallic")
-        # box.row().prop(context.material.pbepbs, "roughness")
+# Matrix to convert from xyz to rgb
+xyz_to_rgb = mathutils.Matrix((
+    (3.2406, -0.9689, 0.0557),
+    (-1.5372, 1.8758, -0.2050),
+    (-0.4986, 0.0415, 1.0570)
+)).transposed()
 
-        # if not context.material.pbepbs.metallic:
-        #     box.row().prop(context.material.pbepbs, "ior")
 
-        # box.row().prop(context.material.pbepbs, "normal_strength")
-        # box.row()
+def get_temperature_color_preview(lamp_props):
+    """ Returns a preview color for the lamp data when a color temperature is used """
+    temperature = lamp_props.color_temperature
 
-        # self.layout.separator()
+    mm = 1000.0 / temperature
+    mm2 = mm ** 2
+    mm3 = mm2 * mm
+    x, y = 0, 0
 
-        # box = self.layout.box()
-        # box.label("Special properties")
-        # box.row().prop(context.material.pbepbs, "emissive_factor")
-        # box.row().prop(context.material.pbepbs, "translucency")
-        # box.row().prop(context.material, "alpha", "Transparency")
-        # box.row()
-        # # self.layout.separator()
+    if temperature < 4000:
+        x = -0.2661239 * mm3 - 0.2343580 * mm2 + 0.8776956 * mm + 0.179910
+    else:
+        x = -3.0258469 * mm3 + 2.1070379 * mm2 + 0.2226347 * mm + 0.240390
 
-        # self.layout.label("Operators:")
-        # self.layout.row().operator("pbepbs.set_default_textures")
+    x2 = x**2
+    x3 = x2 * x
+    if temperature < 2222:
+        y = -1.1063814 * x3 - 1.34811020 * x2 + 2.18555832 * x - 0.20219683
+    elif temperature < 4000:
+        y = -0.9549476 * x3 - 1.37418593 * x2 + 2.09137015 * x - 0.16748867
+    else:
+        y = 3.0817580 * x3 - 5.87338670 * x2 + 3.75112997 * x - 0.37001483
 
-        # self.layout.separator()
+    # xyY to XYZ, assuming Y=1.
+    xyz = mathutils.Vector((x / y, 1, (1 - x - y) / y))
+    return xyz_to_rgb * xyz
 
 
 class PBSLampProps(bpy.types.PropertyGroup):
@@ -249,7 +302,10 @@ class PBSLampProps(bpy.types.PropertyGroup):
         if context.object:
             context.object.data.shadow_buffer_size = int(context.object.data.pbepbs.shadow_map_res)
 
-
+    def update_color_temperature(self, context):
+        if context.object:
+            if context.object.data.pbepbs.use_temperature:
+                context.object.data.color = get_temperature_color_preview(context.object.data.pbepbs)
 
     shadow_map_res = bpy.props.EnumProperty(
         name="Shadow Resolution",
@@ -262,11 +318,40 @@ class PBSLampProps(bpy.types.PropertyGroup):
             ("2048", "2048 px", "2048 Pixel Resolution")
         ),
         default="128",
-        update=update_shadow_resolution)
+        update=update_shadow_resolution
+    )
 
+    use_temperature = bpy.props.BoolProperty(
+        name="Use Color Temperature",
+        default=True,
+        description="Whether to set the lights color via a color temperature",
+        update=update_color_temperature
+    )
+
+    color_temperature = bpy.props.FloatProperty(
+        name="Color Temperature",
+        description="Color teperature of the light in Kelvin",
+        default=6500.0,
+        precision=0,
+        step=500,
+        min=1400.0, max=25000.0,
+        update=update_color_temperature
+    )
+
+    color_preview = bpy.props.FloatVectorProperty(
+        name="Color Preview",
+        description="Color preview of the temperature",
+        subtype="COLOR",
+        size=3,
+        default=(1, 1, 1),
+        min=0.0, max=1.0,
+        set=None,
+        get=get_temperature_color_preview
+    )
 
 def register():
     bpy.utils.register_class(OperatorSetDefaultTextures)
+    bpy.utils.register_class(OperatorFixLampTypes)
     bpy.utils.register_class(PBSMatProps)
     bpy.utils.register_class(PBSLampProps)
     bpy.utils.register_class(PBSMaterial)
@@ -275,9 +360,11 @@ def register():
     bpy.types.Material.pbepbs = bpy.props.PointerProperty(type=PBSMatProps)
     bpy.types.Lamp.pbepbs = bpy.props.PointerProperty(type=PBSLampProps)
 
+
 def unregister():
     del bpy.types.Material.pbepbs
     bpy.utils.unregister_class(OperatorSetDefaultTextures)
+    bpy.utils.unregister_class(OperatorFixLampTypes)
     bpy.utils.unregister_class(PBSMatProps)
     bpy.utils.unregister_class(PBSLampProps)
     bpy.utils.unregister_class(PBSMaterial)
