@@ -161,7 +161,7 @@ class SceneWriter:
         self._stats_exported_objs += 1
 
         # Create a new panda node with the transform
-        if len(obj.lod_levels) > 0:
+        if hasattr(obj,'lod_levels') and len(obj.lod_levels) > 0:
             node = LODNode(obj.name)
             self._handle_lod(obj, node)
         else:
