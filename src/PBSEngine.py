@@ -90,7 +90,8 @@ def register():
     properties_texture.TEXTURE_PT_mapping.COMPAT_ENGINES.add('P3DPBS')
 
     from bl_ui import properties_game
-    properties_game.OBJECT_PT_levels_of_detail.COMPAT_ENGINES.add('P3DPBS')
+    if hasattr( properties_game , 'OBJECT_PT_levels_of_detail'):
+        properties_game.OBJECT_PT_levels_of_detail.COMPAT_ENGINES.add('P3DPBS')
 
     from bl_ui import properties_particle
     properties_particle.PARTICLE_PT_context_particles.COMPAT_ENGINES.add('P3DPBS')
