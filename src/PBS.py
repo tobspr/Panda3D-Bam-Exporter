@@ -123,7 +123,7 @@ class PBSMatProps(bpy.types.PropertyGroup):
         description="Values > 0.0 make the material emissive, receiving no shading "
                     "but emitting light with a color of the BaseColor instead",
         subtype="FACTOR",
-        default=0.1, min=0.0, max=1.0)
+        default=0.0, min=0.0, max=1.0)
 
     translucency = bpy.props.FloatProperty(
         name="Translucency",
