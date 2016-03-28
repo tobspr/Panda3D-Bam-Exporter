@@ -295,7 +295,7 @@ class GeometryWriter:
 
                 # Create a virtual material if the slot contains a material. Otherwise
                 # just use an empty material
-                if slot and slot.material:
+                if slot:
                     render_state = self.writer.material_writer.create_state_from_material(slot.material)
                 else:
                     render_state = RenderState.empty

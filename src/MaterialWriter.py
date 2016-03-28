@@ -13,8 +13,25 @@ class MaterialWriter(object):
         self.material_state_cache = {}
         self.exporter = exporter
 
+        self.make_default_material()
+
+    def make_default_material(self):
+        """ Creates the default material """
+        self.default_material = Material()
+        self.default_state = RenderState()
+        self.default_state.attributes.append(MaterialAttrib(self.default_material))
+
+        self.default_material.base_color = (0.7, 0.7, 0.7, 1.0)
+        self.default_material.metallic = 0.0
+        self.default_material.roughness = 0.5
+        self.default_material.refractive_index = 1.5
+        self.default_material.emission = (0, 0, 0, 0)
+
     def create_state_from_material(self, material):
         """ Creates a render state based on a material """
+
+        if not material:
+            return self.default_state
 
         # Check if we already created this material
         if material.name in self.material_state_cache:
@@ -26,7 +43,6 @@ class MaterialWriter(object):
 
         # Extract the material properties:
         # In case we use PBS, encode its properties in a special way
-
         if not self.exporter.settings.use_pbs:
             virtual_material.diffuse = (
                 material.diffuse_color[0] * material.diffuse_intensity,

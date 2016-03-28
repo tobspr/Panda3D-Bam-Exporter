@@ -1,6 +1,12 @@
 
 import os
 import bpy
+import time
+import socket
+import pickle
+import select
+import random
+import struct
 
 from ExportException import ExportException
 from SceneWriter import SceneWriter
@@ -13,28 +19,34 @@ class PBSEngine(bpy.types.RenderEngine):
     def render(self, scene):
         """ Renders the given scene using the Render Pipeline """
 
+        render_start = time.time()
+
         # Get the different required paths
         base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../rp")
         temp_bam_path = os.path.join(base_path, "preview.bam")
         temp_output_path = os.path.join(base_path, "output.png")
-        generator_path = os.path.join(base_path, "generate.py")
         loading = os.path.join(base_path, "loading.png")
+
+        self.update_progress(0.1)
 
         scale = scene.render.resolution_percentage / 100.0
         self.size_x = int(scene.render.resolution_x * scale)
         self.size_y = int(scene.render.resolution_y * scale)
 
-        # Load a temporary loading screen
-        result = self.begin_result(0, 0, self.size_x, self.size_y)
-        result.layers[0].load_from_file(loading, 0, 0)
-        self.end_result(result)
+        if self.size_x < 64 or self.size_y < 64:
+            # This is a preview, skip it, to avoid overhead
+            result = self.begin_result(0, 0, self.size_x, self.size_y)
+            self.end_result(result)
+            return
 
         objects = []
 
         # Collect the objects to export
         for obj_name, obj_handle in scene.objects.items():
-            if obj_handle.type == "CAMERA" or obj_handle.is_visible(scene):
+            if obj_handle.is_visible(scene) or obj_handle.type == "CAMERA":
                 objects.append(obj_handle)
+
+        self.update_progress(0.2)
 
         # Export the scene as .bam file
         try:
@@ -48,14 +60,62 @@ class PBSEngine(bpy.types.RenderEngine):
             print("Error during preview export:", err.message)
             return {'CANCELLED'}
 
-        # Invoke renderer
-        cmd = 'python "' + generator_path + '" {} {}'.format(self.size_x, self.size_y)
-        os.system(cmd)
+        self.update_progress(0.6)
 
-        # Write result
-        result = self.begin_result(0, 0, self.size_x, self.size_y)
-        result.layers[0].load_from_file(temp_output_path, 0, 0)
+        # Invoke renderer
+        renderer_ip = ("127.0.0.1", 62360)
+        pingback_port = random.randint(30000, 65000)
+
+        payload = {
+            "scene": temp_bam_path,
+            "dest": temp_output_path,
+            "view_size_x": self.size_x,
+            "view_size_y": self.size_y,
+            "pingback_port": pingback_port
+        }
+
+        message = pickle.dumps(payload, protocol=0)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.sendto(message, renderer_ip)
+        except Exception as msg:
+            sock.close()
+            raise msg
+
+        self.update_progress(0.8)
+
+        print("Waiting for response .. ")
+
+        # Wait until the render pipeline responds
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.settimeout(3.0)
+
+        try:
+            sock.bind(("localhost", pingback_port))
+        except Exception as msg:
+            print("Could not connect to pingback_port - maybe a render result is still waiting?")
+            print("Error message:", msg)
+            return
+
+        sock.listen(1)
+
+        try:
+            conn, addr = sock.accept()
+        except socket.timeout:
+            print("No render pipeline response within timeout!")
+            sock.close()
+            return
+
+        sock.close()
+
+        result = self.begin_result(0, 0, 512, 512)
+        result.layers[0].load_from_file(temp_output_path)
         self.end_result(result)
+
+        render_dur = (time.time() - render_start) * 1000.0
+        print("Finished render in", render_dur, "ms")
+
 
 def register():
     bpy.utils.register_class(PBSEngine)
@@ -92,6 +152,9 @@ def register():
     from bl_ui import properties_game
     if hasattr( properties_game , 'OBJECT_PT_levels_of_detail'):
         properties_game.OBJECT_PT_levels_of_detail.COMPAT_ENGINES.add('P3DPBS')
+
+    from bl_ui import properties_data_lamp
+    properties_data_lamp.DATA_PT_preview.COMPAT_ENGINES.add('P3DPBS')
 
     from bl_ui import properties_particle
     properties_particle.PARTICLE_PT_context_particles.COMPAT_ENGINES.add('P3DPBS')

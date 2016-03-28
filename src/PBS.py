@@ -111,7 +111,7 @@ class PBSMatProps(bpy.types.PropertyGroup):
         description="Index of refraction, usually 1.5 for most materials.",
         subtype="FACTOR",
         update=update_specular,
-        default=1.5, min=1.0, max=2.4)
+        default=1.5, min=1.001, max=2.4)
 
     metallic = bpy.props.BoolProperty(
         name="Metallic",
@@ -166,7 +166,12 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
                     break
             else:
                 bpy.ops.image.open(filepath=default_pth, relative_path=False)
-                image = bpy.data.images[texname + ".png"]
+                for key in bpy.data.images.keys():
+                    if (texname + ".png") in key:
+                        image = bpy.data.images[key]
+                        break
+                else:
+                    raise Exception("Loaded " + texname + " from '" + default_pth + "' but it was not loaded into bpy.data.images!")
 
             texture = None
             for tex in bpy.data.textures:
