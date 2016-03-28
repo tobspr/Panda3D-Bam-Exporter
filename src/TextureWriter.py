@@ -191,10 +191,12 @@ class TextureWriter(object):
         if not texture_slot or not texture_slot.texture or texture_slot.texture.type == "NONE":
             return None
 
+        cache_key = texture_slot.name + "-sort:" + str(sort)
+
         # Check if the texture slot was already processed, and if so, return the
         # cached result
-        if texture_slot.name in self.textures_cache:
-            return self.textures_cache[texture_slot.name]
+        if cache_key in self.textures_cache:
+            return self.textures_cache[cache_key]
 
         # Check if the texture slot mode is supported
         if texture_slot.texture_coords != "UV":
@@ -251,5 +253,5 @@ class TextureWriter(object):
             else:
                 print("WARNING: Cannot set srgb on less than 3 channel texture:", stage_node.texture.name)
 
-        self.textures_cache[texture_slot.name] = stage_node
+        self.textures_cache[cache_key] = stage_node
         return stage_node
