@@ -17,10 +17,10 @@ After cloning, make sure to execute `git submodule init` and then `git submodule
 Alternatively, you can clone the repository with the `recursive` option:
 `git clone --recursive https://github.com/tobspr/Panda3D-Bam-Exporter.git`
 
+### Usage
+
 If you want the preview to work, you need to start the RenderPipeline's render service.
 It is located in `$RenderPipelineDirectory$/toolkit/render_service/service.py`.
-
-### Usage
 
 After you installed the plugin, you should have an entry `File > Export > Panda3D (.bam)`.
 You can also use the quick search, press `space` and then type `bam`.
