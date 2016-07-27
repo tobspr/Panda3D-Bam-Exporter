@@ -14,8 +14,8 @@ included when you use the `Download ZIP` button.
 
 After cloning, make sure to execute `git submodule init` and then `git submodule update`.
 
-Alternatively, you can clone the repository with the `recursive` option:
-`git clone --recursive https://github.com/tobspr/Panda3D-Bam-Exporter.git`
+Alternatively, you can clone the repository using the `recursive` option:
+```git clone --recursive https://github.com/tobspr/Panda3D-Bam-Exporter.git```
 
 ### Usage
 
