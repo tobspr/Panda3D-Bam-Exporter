@@ -142,49 +142,52 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
     """ Operator to fill the empty texture slots on a material with default textures """
 
     bl_idname = "pbepbs.set_default_textures"
-    bl_label = "Fill default PBS textures"
+    bl_label = "Fill all materials with default PBS textures"
 
     def execute(self, context):
-        if not hasattr(context, "material"):
-            return {'CANCELLED'}
+        # if not hasattr(context, "material"):
+            # return {'CANCELLED'}
+
+
         print("Executing default texture operator")
-        material = context.material
+        # material = context.material
+        for material in bpy.data.materials:
+            print("Processing material", material)
+            for index, slot_name in enumerate(["basecolor", "normal", "specular", "roughness"]):
+                slot = material.texture_slots[index]
+                if slot is not None and slot.texture is not None:
+                    continue
 
-        for index, slot_name in enumerate(["basecolor", "normal", "specular", "roughness"]):
-            slot = material.texture_slots[index]
-            if slot is not None and slot.texture is not None:
-                continue
+                slot = material.texture_slots.create(index)
+                texname = "empty_" + slot_name
+                default_pth = join(dirname(__file__), "../res/" + texname + ".png")
 
-            slot = material.texture_slots.create(index)
-            texname = "empty_" + slot_name
-            default_pth = join(dirname(__file__), "../res/" + texname + ".png")
-
-            image = None
-            for img in bpy.data.images:
-                if img.filepath == default_pth:
-                    image = img
-                    break
-            else:
-                bpy.ops.image.open(filepath=default_pth, relative_path=False)
-                for key in bpy.data.images.keys():
-                    if (texname + ".png") in key:
-                        image = bpy.data.images[key]
+                image = None
+                for img in bpy.data.images:
+                    if img.filepath == default_pth:
+                        image = img
                         break
                 else:
-                    raise Exception("Loaded " + texname + " from '" + default_pth + "' but it was not loaded into bpy.data.images!")
+                    bpy.ops.image.open(filepath=default_pth, relative_path=False)
+                    for key in bpy.data.images.keys():
+                        if (texname + ".png") in key:
+                            image = bpy.data.images[key]
+                            break
+                    else:
+                        raise Exception("Loaded " + texname + " from '" + default_pth + "' but it was not loaded into bpy.data.images!")
 
-            texture = None
-            for tex in bpy.data.textures:
-                if tex.name == texname:
-                    texture = tex
-                    break
-            else:
-                texture = bpy.data.textures.new(texname, type="IMAGE")
+                texture = None
+                for tex in bpy.data.textures:
+                    if tex.name == texname:
+                        texture = tex
+                        break
+                else:
+                    texture = bpy.data.textures.new(texname, type="IMAGE")
 
-            texture.image = image
+                texture.image = image
 
-            slot.texture_coords = "UV"
-            slot.texture = texture
+                slot.texture_coords = "UV"
+                slot.texture = texture
 
         return {'FINISHED'}
 
