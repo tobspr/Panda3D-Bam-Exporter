@@ -123,10 +123,27 @@ class MaterialWriter(object):
         stage_nodes = []
         for idx, tex_slot in enumerate(material.texture_slots):
             use_srgb = idx == 0
-            stage_node = self.exporter.texture_writer.create_stage_node_from_texture_slot(
-                tex_slot, sort=idx*10, use_srgb=use_srgb)
-            if stage_node:
-                stage_nodes.append(stage_node)
+
+            if tex_slot:
+                lower_name = tex_slot.name.lower().replace(" ", "")
+                if ("diffuse" in lower_name or
+                    "albedo" in lower_name or
+                    "basecolor" in lower_name):
+                    use_srgb = True
+
+                if use_srgb:
+                    print("Detected srgb for texture", tex_slot.name)
+                else:
+                    print("Using standard rgb for texture", tex_slot.name)
+                stage_node = self.exporter.texture_writer.create_stage_node_from_texture_slot(
+                    tex_slot, sort=idx*10, use_srgb=use_srgb)
+                if stage_node:
+                    stage_nodes.append(stage_node)
+                else:
+                    print("WARNING: Invalid texture slot", tex_slot.name)
+            else:
+                if idx < 4:
+                    print("WARNING: Empty required texture slot on", material.name)
 
         # Check if there is at least one texture, and if so, create a texture attrib
         if len(stage_nodes) > 0:

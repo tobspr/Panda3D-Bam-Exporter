@@ -148,7 +148,6 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
         # if not hasattr(context, "material"):
             # return {'CANCELLED'}
 
-
         print("Executing default texture operator")
         # material = context.material
         for material in bpy.data.materials:

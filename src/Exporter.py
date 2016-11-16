@@ -89,6 +89,11 @@ class ExportOperator(bpy.types.Operator, ExportHelper):
             self.report({'ERROR'}, "No objects selected!")
             return {'CANCELLED'}
 
+        # Fill default textures first
+        bpy.ops.pbepbs.set_default_textures()
+        bpy.ops.pbepbs.fix_lamp_types()
+
+
         # Try to execute the export process
         try:
             writer = SceneWriter()
