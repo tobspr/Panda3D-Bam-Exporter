@@ -39,7 +39,7 @@ class MaterialWriter(object):
 
         # Create the render and material state
         virtual_state = RenderState()
-        virtual_material = Material()
+        virtual_material = Material(material.name)
 
         # Extract the material properties:
         # In case we use PBS, encode its properties in a special way
