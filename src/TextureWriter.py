@@ -84,18 +84,23 @@ class TextureWriter(object):
         tex_handle = texture_slot.texture
         if tex_handle:
 
-            # Process texture settings
+            # Mipmapping & Filtering
+            use_mipmaps = hasattr(tex_handle, "use_mipmap") and tex_handle.use_mipmap
+            use_interpolation = hasattr(tex_handle, "use_interpolation") and tex_handle.use_interpolation
 
-            # Mipmapping
-            if hasattr(tex_handle, "use_mipmap") and tex_handle.use_mipmap:
-                state.minfilter = SamplerState.FT_linear_mipmap_linear
+            # Find the right sampler state
+            if use_interpolation:
+                state.magfilter = SamplerState.FT_linear
             else:
-                if hasattr(tex_handle, "use_interpolation") and not tex_handle.use_interpolation:
-                    state.minfilter = SamplerState.FT_nearest
-                else:
-                    state.minfilter = SamplerState.FT_linear
+                state.magfilter = SamplerState.FT_nearest
 
-            state.magfilter = SamplerState.FT_linear
+            if use_mipmaps:
+                if use_interpolation:
+                    state.minfilter = SamplerState.FT_linear_mipmap_linear
+                else:
+                    state.minfilter = SamplerState.FT_linear_mipmap_nearest
+            else:
+                state.minfilter = state.magfilter
 
             # Texture wrap modes
             wrap_modes = {
