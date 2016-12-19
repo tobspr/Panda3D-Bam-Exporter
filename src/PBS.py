@@ -185,8 +185,15 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
 
                 texture.image = image
 
-                slot.texture_coords = "UV"
+                try:
+                    slot.texture_coords = "UV"
+                except Exception as msg:
+                    print("FAILED to set texture slot, due to the following error:")
+                    print(msg)
+                    slot.texture_coords = "GLOBAL"
                 slot.texture = texture
+        
+        print("Done.")
 
         return {'FINISHED'}
 
@@ -239,6 +246,10 @@ class PBSDataPanel(bpy.types.Panel):
                 box.row().label("Type not supported yet!")
                 return
 
+            if obj.data.type == "POINT":            
+                box.row().prop(pbs_data, "sphere_radius")
+
+
             box.row().prop(pbs_data, "use_temperature")
 
             if pbs_data.use_temperature:
@@ -261,8 +272,6 @@ class PBSDataPanel(bpy.types.Panel):
 
             if obj.data.type == "SPOT":
                 box.row().prop(obj.data, "spot_size")
-
-
 
 # Matrix to convert from xyz to rgb
 xyz_to_rgb = mathutils.Matrix((
@@ -355,6 +364,15 @@ class PBSLampProps(bpy.types.PropertyGroup):
         set=None,
         get=get_temperature_color_preview
     )
+
+    sphere_radius = bpy.props.FloatProperty(
+        name="Sphere Radius",
+        default=1.0,
+        description="Spherical Area Light Sphere radius",
+        min=0.05,
+        max=100.0
+    )
+
 
 def register():
     bpy.utils.register_class(OperatorSetDefaultTextures)

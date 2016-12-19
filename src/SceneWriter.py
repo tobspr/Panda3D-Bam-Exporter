@@ -93,7 +93,8 @@ class SceneWriter:
         """ Internal method to handle a light """
         print("Exporting point light", obj.name)
         if obj.data.type == "POINT":
-            light_node = PointLight(obj.name)
+            light_node = SphereLight(obj.name)
+            light_node.radius = obj.data.pbepbs.sphere_radius
 
         elif obj.data.type == "SPOT":
             light_node = Spotlight(obj.name)
