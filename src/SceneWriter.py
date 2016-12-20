@@ -91,7 +91,7 @@ class SceneWriter:
 
     def _handle_light(self, obj, parent):
         """ Internal method to handle a light """
-        print("Exporting point light", obj.name)
+        print("Exporting light", obj.name, "of type", obj.data.type)
         if obj.data.type == "POINT":
             light_node = SphereLight(obj.name)
             light_node.radius = obj.data.pbepbs.sphere_radius
@@ -108,10 +108,9 @@ class SceneWriter:
                 size_y = obj.data.size_y
 
             parent.transform.mat *= mathutils.Matrix(((0, size_x, 0, 0),
-                                                      (0, 0, -size_y, 0),
+                                                      (0, 0, size_y, 0),
                                                       (1, 0, 0, 0),
                                                       (0, 0, 0, 1)))
-
 
         else:
             print("TODO: Support light type:", obj.data.type)
