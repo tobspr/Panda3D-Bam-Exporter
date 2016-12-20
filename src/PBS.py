@@ -240,16 +240,20 @@ class PBSDataPanel(bpy.types.Panel):
             pbs_data = obj_data.pbepbs
 
             box = self.layout.box()
+            
+            # Header
+            row = box.row(align=True)
+            row.alignment = 'CENTER'
+            row.label(text="Panda3D PBS Properties")
+            box.row()
+
             box.row().prop(obj.data, "type", "Light type")
 
-            if obj.data.type not in ("POINT", "SPOT"):
+            if obj.data.type not in ("POINT", "SPOT", "AREA"):
                 box.row().label("Type not supported yet!")
                 return
 
-            if obj.data.type == "POINT":            
-                box.row().prop(pbs_data, "sphere_radius")
-
-
+            # Light color
             box.row().prop(pbs_data, "use_temperature")
 
             if pbs_data.use_temperature:
@@ -258,10 +262,30 @@ class PBSDataPanel(bpy.types.Panel):
             else:
                 box.row().prop(obj.data, "color", "Color")
 
+            if obj.data.type == "POINT":            
+                box.row().prop(pbs_data, "sphere_radius")
 
-            box.row().prop(obj.data, "distance", "Radius")
-            box.row().prop(obj.data, "energy", "Brightness")
+            # Maximum culling distance
+            box.row().prop(obj.data, "distance", "Max Cull Distance")
+            
+            # Light intensity
+            box.row().prop(obj.data, "energy", "Intensity (Lumens)")
 
+            # Spot light size
+            if obj.data.type == "SPOT":
+                box.row().prop(obj.data, "spot_size")
+
+            # Area light size
+            if obj.data.type == "AREA":
+                box.row().prop(obj.data, "shape", "Shape")
+                
+                if obj.data.shape == "SQUARE":
+                    box.row().prop(obj.data, "size", "Size")
+                else:
+                    box.row().prop(obj.data, "size", "Width")
+                    box.row().prop(obj.data, "size_y", "Height")
+
+            # Shadows
             box.row().prop(obj.data, "use_shadow", "Enable Shadows")
 
             if obj.data.use_shadow:
@@ -270,8 +294,7 @@ class PBSDataPanel(bpy.types.Panel):
                 if int(pbs_data.shadow_map_res) > 512:
                     box.row().label("WARNING: Very high shadow map resolution!")
 
-            if obj.data.type == "SPOT":
-                box.row().prop(obj.data, "spot_size")
+            box.row()
 
 # Matrix to convert from xyz to rgb
 xyz_to_rgb = mathutils.Matrix((

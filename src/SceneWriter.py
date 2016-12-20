@@ -99,8 +99,22 @@ class SceneWriter:
         elif obj.data.type == "SPOT":
             light_node = Spotlight(obj.name)
             light_node.exponent = obj.data.spot_size
+
+        elif obj.data.type == "AREA":
+            light_node = RectangleLight(obj.name)
+            size_x = obj.data.size
+            size_y = size_x
+            if obj.data.shape != "SQUARE":
+                size_y = obj.data.size_y
+
+            parent.transform.mat *= mathutils.Matrix(((0, size_x, 0, 0),
+                                                      (0, 0, -size_y, 0),
+                                                      (1, 0, 0, 0),
+                                                      (0, 0, 0, 1)))
+
+
         else:
-            print("TODO: Support other light types")
+            print("TODO: Support light type:", obj.dat.type)
             return
 
         color = obj.data.color
@@ -112,7 +126,10 @@ class SceneWriter:
         light_node.shadow_caster = obj.data.use_shadow
         light_node.sb_xsize = int(obj.data.pbepbs.shadow_map_res)
         light_node.sb_ysize = light_node.sb_ysize
-        light_node.attenuation = (0, 0, 1)
+
+        if obj.data.type in ("SPOT", "POINT"):
+            light_node.attenuation = (0, 0, 1)
+    
         light_node.max_distance = obj.data.distance
         parent.add_child(light_node)
 
@@ -160,18 +177,18 @@ class SceneWriter:
         print("Exporting object:", obj.name)
 
         self._stats_exported_objs += 1
+        transform = TransformState()
+        transform.mat = obj.matrix_world
 
         # Create a new panda node with the transform
         if hasattr(obj,'lod_levels') and len(obj.lod_levels) > 0:
             node = LODNode(obj.name)
+            node.transform = transform
             self._handle_lod(obj, node)
         else:
             node = PandaNode(obj.name)
+            node.transform = transform
             self._handle_object_data(obj, node)
-
-        # Create the transform state based on the object
-        node.transform = TransformState()
-        node.transform.mat = obj.matrix_world
 
         # Attach the node to the scene graph
         parent.add_child(node)
