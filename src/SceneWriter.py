@@ -114,7 +114,7 @@ class SceneWriter:
 
 
         else:
-            print("TODO: Support light type:", obj.dat.type)
+            print("TODO: Support light type:", obj.data.type)
             return
 
         color = obj.data.color
