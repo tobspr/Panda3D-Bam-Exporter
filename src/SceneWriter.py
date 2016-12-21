@@ -277,13 +277,17 @@ class SceneWriter:
             print("Skipping particle system", particle_system.name, "since it has no dupli-object assigned.")
             return
 
-        parent_transform_inverse = obj.matrix_world.inverted()
+        particle_transform = obj.matrix_world.inverted()
+
+        if settings.use_global_dupli:
+            # Take object transform into account
+            particle_transform *= duplicated_object.matrix_local
 
         for i, particle in enumerate(particle_system.particles):
             rotation = particle.rotation.to_matrix().to_4x4()
             location = mathutils.Matrix.Translation(particle.location)
             scale = mathutils.Matrix.Scale(particle.size, 3).to_4x4()
-            particle_mat = parent_transform_inverse * (location * rotation * scale)
+            particle_mat = particle_transform * (location * rotation * scale)
             node = PandaNode("Particle-" + str(i))
             node.transform = TransformState()
             node.transform.mat = particle_mat
