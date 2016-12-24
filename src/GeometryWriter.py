@@ -4,6 +4,7 @@ import bmesh
 from array import array
 from pybamwriter.panda_types import *
 
+
 class GeometryWriter:
 
     """ Helper class to write out the actual vertices """
@@ -13,7 +14,12 @@ class GeometryWriter:
         self.writer = writer
         self.geom_cache = {}
 
-    def _group_mesh_faces_by_material(self, mesh, num_slots = 40):
+    @property
+    def log_instance(self):
+        """ Helper to access the log instance """
+        return self.writer.log_instance
+
+    def _group_mesh_faces_by_material(self, mesh, num_slots=40):
         """ Iterates over all faces of the given mesh, grouping them by their
         material index """
         polygons = [[] for i in range(num_slots)]
@@ -39,9 +45,9 @@ class GeometryWriter:
         self.gvd_formats['v3n3'].total_bytes = self.gvd_formats['v3n3'].stride
         self.gvd_formats['v3n3'].pad_to = 1
         self.gvd_formats['v3n3'].add_column("vertex", 3, GeomEnums.NT_float32,
-                                GeomEnums.C_point, start=0, column_alignment=4)
+                                            GeomEnums.C_point, start=0, column_alignment=4)
         self.gvd_formats['v3n3'].add_column("normal", 3, GeomEnums.NT_float32,
-                                GeomEnums.C_normal, start=3 * 4, column_alignment=4)
+                                            GeomEnums.C_normal, start=3 * 4, column_alignment=4)
 
         # Standard format with texcoords, Vertex + Normal + Texcoord (UV)
         self.gvd_formats['v3n3t2'] = GeomVertexArrayFormat()
@@ -49,11 +55,11 @@ class GeometryWriter:
         self.gvd_formats['v3n3t2'].total_bytes = self.gvd_formats['v3n3t2'].stride
         self.gvd_formats['v3n3t2'].pad_to = 1
         self.gvd_formats['v3n3t2'].add_column("vertex", 3, GeomEnums.NT_float32,
-                                GeomEnums.C_point, start=0, column_alignment=4)
+                                              GeomEnums.C_point, start=0, column_alignment=4)
         self.gvd_formats['v3n3t2'].add_column("normal", 3, GeomEnums.NT_float32,
-                                GeomEnums.C_normal, start=3 * 4, column_alignment=4)
+                                              GeomEnums.C_normal, start=3 * 4, column_alignment=4)
         self.gvd_formats['v3n3t2'].add_column("texcoord", 2, GeomEnums.NT_float32,
-                                GeomEnums.C_texcoord, start=2 * 3 * 4, column_alignment=4)
+                                              GeomEnums.C_texcoord, start=2 * 3 * 4, column_alignment=4)
 
         # Vertex index format, using 16 bit indices
         self.gvd_formats['index16'] = GeomVertexArrayFormat()
@@ -61,7 +67,7 @@ class GeometryWriter:
         self.gvd_formats['index16'].total_bytes = self.gvd_formats['index16'].stride
         self.gvd_formats['index16'].pad_to = 1
         self.gvd_formats['index16'].add_column("index", 1, GeomEnums.NT_uint16,
-            GeomEnums.C_index, start = 0, column_alignment = 1)
+                                               GeomEnums.C_index, start=0, column_alignment=1)
 
         # Vertex index format, using 32 bit indices, used for geoms with more than
         # 2 ** 16 vertices.
@@ -70,10 +76,9 @@ class GeometryWriter:
         self.gvd_formats['index32'].total_bytes = self.gvd_formats['index32'].stride
         self.gvd_formats['index32'].pad_to = 1
         self.gvd_formats['index32'].add_column("index", 1, GeomEnums.NT_uint32,
-            GeomEnums.C_index, start = 0, column_alignment = 1)
+                                               GeomEnums.C_index, start=0, column_alignment=1)
 
-
-    def _create_geom_from_polygons(self, mesh, polygons, uv_coordinates = None):
+    def _create_geom_from_polygons(self, mesh, polygons, uv_coordinates=None):
         """ Creates a Geom from a set of polygons. If uv_coordinates is not None,
         texcoords will be written as well """
 
@@ -84,7 +89,7 @@ class GeometryWriter:
 
         if max_possible_vtx_count >= 2**16 - 1:
             use_32_bit_indices = True
-            print("Using 32 bit indices for large geom:", mesh.name)
+            self.log_instance.warning("Using 32 bit indices for large geom '" + mesh.name + "' - consider splitting it")
 
         # Check wheter the object has texture coordinates assigned
         have_texcoords = uv_coordinates is not None
@@ -99,9 +104,9 @@ class GeometryWriter:
 
         # Create the buffers to store the data inside
         if use_32_bit_indices:
-            index_buffer = array('I') # Unsigned Int
+            index_buffer = array('I')  # Unsigned Int
         else:
-            index_buffer = array('H') # Unsigned Short
+            index_buffer = array('H')  # Unsigned Short
 
         vertex_buffer = array('f')
 
@@ -228,7 +233,6 @@ class GeometryWriter:
 
         return geom
 
-
     def write_mesh(self, obj, parent):
         """ Internal method to process a mesh during the export process """
 
@@ -248,10 +252,10 @@ class GeometryWriter:
 
             # Convert the object to a mesh, so we can read the polygons
             mesh = obj.to_mesh(self.writer.context.scene,
-                apply_modifiers = True,
-                settings = 'PREVIEW',
-                calc_tessface = True,
-                calc_undeformed = True)
+                               apply_modifiers=True,
+                               settings='PREVIEW',
+                               calc_tessface=True,
+                               calc_undeformed=True)
 
             # Get a BMesh representation
             b_mesh = bmesh.new()

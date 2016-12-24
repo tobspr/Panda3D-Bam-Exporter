@@ -4,36 +4,37 @@ from bpy_extras.io_utils import ExportHelper
 
 from SceneWriter import SceneWriter
 from ExportException import ExportException
+from ExportLog import ExportLog
 
 
 class ExportSettings(bpy.types.PropertyGroup):
     """ This class stores the exporter settings """
 
-    tex_mode =  bpy.props.EnumProperty(
-            name="Texture handling",
-            description="How to handle textures",
-            items=[
-                ("ABSOLUTE", "Absolute", "Store absolute paths to the textures"),
-                ("RELATIVE", "Relative", "Store relative paths to the textures"),
-                ("COPY", "Copy (Recommended)", "Copy the textures to a folder relative to the bam file"),
-                ("INCLUDE", "Include", "Include the textures in the bam file"),
-                ("KEEP", "Keep", "Use the same texture path settings that blender uses (advanced)"),
-            ],
-            default="COPY")
+    tex_mode = bpy.props.EnumProperty(
+        name="Texture handling",
+        description="How to handle textures",
+        items=[
+            ("ABSOLUTE", "Absolute", "Store absolute paths to the textures"),
+            ("RELATIVE", "Relative", "Store relative paths to the textures"),
+            ("COPY", "Copy (Recommended)", "Copy the textures to a folder relative to the bam file"),
+            ("INCLUDE", "Include", "Include the textures in the bam file"),
+            ("KEEP", "Keep", "Use the same texture path settings that blender uses (advanced)"),
+        ],
+        default="COPY")
 
     tex_copy_path = bpy.props.StringProperty(
-            name="Texture copy path",
-            description="The relative path where to copy the textures to",
-            default="./tex/")
+        name="Texture copy path",
+        description="The relative path where to copy the textures to",
+        default="./tex/")
 
     use_pbs = bpy.props.BoolProperty(
-            name="Use PBS addon",
-            description="Whether to use the Physically Based Shading addon. This "
-                        "stores the physically based properties of the material in "
-                        "the diffuse and specular components to be used in the application "
-                        "later on",
-            default=True
-        )
+        name="Use PBS addon",
+        description="Whether to use the Physically Based Shading addon. This "
+        "stores the physically based properties of the material in "
+        "the diffuse and specular components to be used in the application "
+        "later on",
+        default=True
+    )
 
     bam_version = bpy.props.EnumProperty(
         name="Bam Version",
@@ -44,9 +45,9 @@ class ExportSettings(bpy.types.PropertyGroup):
             ('6.24', '6.24 (Panda3D 1.7.1 / 1.7.2)', 'Writes bams for 1.7.1 and 1.7.2'),
             ('6.30', '6.30 (Panda3D 1.8.x)', 'Writes bams for 1.8.x'),
             ('6.37', '6.37 (Panda3D 1.9.x)', 'Writes bams for 1.9.x'),
-            ('6.41', '6.41 (Panda3D DEVEL)', 'Writes bams for the devel version (1.10)'),
+            ('6.42', '6.42 (Panda3D DEVEL)', 'Writes bams for the devel version (1.10)'),
         ),
-        default='6.41')
+        default='6.42')
 
     def draw(self, layout):
         """ This function is called by the PBEExportOperator, whenever the export-
@@ -79,32 +80,40 @@ class ExportOperator(bpy.types.Operator, ExportHelper):
         objects = bpy.context.selected_objects
         scene = bpy.context.scene
 
+        log_instance = ExportLog()
+
         # Check if there exists a settings datablock
         if not hasattr(scene, "pbe") or not scene.pbe:
-            self.report({'ERROR'}, "Scene has no PBE datablock")
+            log_instance.error("Scene has no PBE datablock")
+            log_instance.report()
             return {'CANCELLED'}
 
         # Check if there are active objects
         if len(objects) < 1:
-            self.report({'ERROR'}, "No objects selected!")
+            log_instance.error("No objects selected")
+            log_instance.report()
             return {'CANCELLED'}
 
         # Fix scene properties first
         bpy.ops.pbepbs.set_default_textures()
         bpy.ops.pbepbs.fix_lamp_types()
+        bpy.ops.pbepbs.fix_negative_scale()
 
         # Try to execute the export process
         try:
             writer = SceneWriter()
+            writer.set_log_instance(log_instance)
             writer.set_context(bpy.context)
             writer.set_settings(scene.pbe)
             writer.set_filepath(self.filepath)
             writer.set_objects(objects)
             writer.write_bam_file()
         except ExportException as err:
-            self.report({'ERROR'}, err.message)
+            log_instance.error("Exception during export:", err)
+            log_instance.report()
             return {'CANCELLED'}
 
+        log_instance.report()
         return {'FINISHED'}
 
     def draw(self, context):
@@ -112,16 +121,17 @@ class ExportOperator(bpy.types.Operator, ExportHelper):
         our properties here so the user can adjust it """
         context.scene.pbe.draw(self.layout)
 
+
 def PBEExportFuncCallback(self, context):
     self.layout.operator(ExportOperator.bl_idname, text="Panda3D (.bam)")
 
-# Register the module
 
 def register():
     bpy.utils.register_class(ExportSettings)
     bpy.utils.register_class(ExportOperator)
     bpy.types.INFO_MT_file_export.append(PBEExportFuncCallback)
     bpy.types.Scene.pbe = bpy.props.PointerProperty(type=ExportSettings)
+
 
 def unregister():
     try:

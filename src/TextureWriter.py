@@ -8,6 +8,7 @@ from Util import convert_blender_file_format, convert_to_panda_filepath
 from ExportException import ExportException
 from pybamwriter.panda_types import *
 
+
 class TextureWriter(object):
 
     """ This class handles the writing of textures, either generated ones
@@ -17,6 +18,11 @@ class TextureWriter(object):
         self.textures_cache = {}
         self.images_cache = {}
         self.writer = writer
+
+    @property
+    def log_instance(self):
+        """ Helper to access the log instance """
+        return self.writer.log_instance
 
     def _save_image(self, image):
         """ Saves an image to the disk """
@@ -31,7 +37,6 @@ class TextureWriter(object):
         tex_name = bpy.path.basename(old_filename)
         dest_filename = os.path.join(
             os.path.dirname(self.writer.filepath), str(self.writer.settings.tex_copy_path), tex_name)
-
 
         # Check if the target directory exists, and if not, create it
         target_dir = os.path.dirname(dest_filename)
@@ -64,7 +69,7 @@ class TextureWriter(object):
             extension = convert_blender_file_format(copy.file_format)
             dest_filename = ".".join(dest_filename.split(".")[:-1]) + extension
 
-            print("Save image copy to", dest_filename)
+            self.log_instance.info("Saving image copy to", dest_filename)
             copy.filepath_raw = dest_filename
 
             # Finally try to save the image
@@ -73,7 +78,7 @@ class TextureWriter(object):
             except Exception as msg:
                 raise ExportException("Error during image export: " + str(msg))
             finally:
-                 bpy.data.images.remove(copy)
+                bpy.data.images.remove(copy)
 
         return dest_filename
 
@@ -116,7 +121,7 @@ class TextureWriter(object):
                     wrap_mode = wrap_modes[tex_handle.extension]
                     state.wrap_u, state.wrap_v, state.wrap_w = [wrap_mode] * 3
                 else:
-                    print("Unkown texture extension:", tex_handle.extension)
+                    self.log_instance.warning("Unkown texture extension:", tex_handle.extension)
 
             # Improve texture sharpness
             state.anisotropic_degree = 16
@@ -141,7 +146,7 @@ class TextureWriter(object):
         elif image.depth == 32:
             texture.num_components = 4
         else:
-            print("WARNING: Cannot determine component count of", image.name, ", assuming 3")
+            self.log_instance.warning("Cannot determine component count of image '" + image.name + "' with depth", image.depth, ", assuming 3")
             texture.num_components = 3
         is_packed = image.packed_file is not None
         current_dir = os.path.dirname(self.writer.filepath)
@@ -205,7 +210,8 @@ class TextureWriter(object):
 
         # Check if the texture slot mode is supported
         if texture_slot.texture_coords != "UV":
-            print("Unsupported texture coordinate mode for slot '" + texture_slot.name + "': " + texture_slot.texture_coords)
+            self.log_instance.warning("Unsupported texture coordinate mode for slot '" +
+                                   texture_slot.name + "': " + texture_slot.texture_coords)
             return None
 
         # Create sampler state
@@ -234,14 +240,14 @@ class TextureWriter(object):
             try:
                 stage_node.texture = self._create_texture_from_image(image)
             except Exception as msg:
-                print("Could not extract image:", msg)
+                self.log_instance.error("Could not extract image:", msg)
                 return None
             stage_node.texture.default_sampler = stage_node.sampler
 
         elif texture.type in ["BLEND", "CLOUDS", "DISTORTED_NOISE", "ENVIRONMENT_MAP",
-            "MAGIC", "MARBLE", "MUSGRAVE", "NOISE", "OCEAN", "POINT_DENSITY",
-            "STUCCI", "VORONOI", "VOXEL_DATA", "WOOD"]:
-            print("TODO: Handle generated image")
+                              "MAGIC", "MARBLE", "MUSGRAVE", "NOISE", "OCEAN", "POINT_DENSITY",
+                              "STUCCI", "VORONOI", "VOXEL_DATA", "WOOD"]:
+            self.log_instance.warning("TODO: Handle generated image")
             return None
 
         else:
@@ -256,7 +262,7 @@ class TextureWriter(object):
             elif stage_node.texture.num_components == 4:
                 stage_node.texture.format = Texture.F_srgb_alpha
             else:
-                print("WARNING: Cannot set srgb on less than 3 channel texture:", stage_node.texture.name)
+                self.log_instance.warning("Cannot set srgb on less than 3 channel texture:", stage_node.texture.name)
 
         self.textures_cache[cache_key] = stage_node
         return stage_node

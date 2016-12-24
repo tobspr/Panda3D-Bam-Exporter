@@ -29,17 +29,15 @@ class PBSMaterial(bpy.types.Panel):
         box.row().prop(pbepbs, "shading_model")
         box.row().prop(context.material, "diffuse_color", "Base Color")
 
-        if pbepbs.shading_model != "EMISSIVE":
+        if pbepbs.shading_model not in ["EMISSIVE", "TRANSPARENT_EMISSIVE"]:
 
-            if pbepbs.shading_model not in ("SKIN", "FOLIAGE", "CLEARCOAT"):
+            if pbepbs.shading_model not in ("SKIN", "FOLIAGE", "CLEARCOAT", "TRANSPARENT_GLASS"):
                 box.row().prop(pbepbs, "metallic")
 
-            if not pbepbs.metallic and  pbepbs.shading_model not in ("CLEARCOAT"):
-                    box.row().prop(pbepbs, "ior", "Index of Refraction")
+            if not pbepbs.metallic and pbepbs.shading_model != "CLEARCOAT":
+                box.row().prop(pbepbs, "ior", "Index of Refraction")
 
             box.row().prop(pbepbs, "roughness")
-
-
             box.row().prop(pbepbs, "normal_strength")
             box.row()
 
@@ -48,11 +46,11 @@ class PBSMaterial(bpy.types.Panel):
         if pbepbs.shading_model not in ("DEFAULT", "FOLIAGE", "CLEARCOAT", "SKIN"):
             box = self.layout.box()
             box.label("Shading model properties")
-            if pbepbs.shading_model == "EMISSIVE":
+            if pbepbs.shading_model in ["EMISSIVE", "TRANSPARENT_EMISSIVE"]:
                 box.row().prop(pbepbs, "emissive_factor")
-            elif pbepbs.shading_model == "TRANSLUCENT":
+            if pbepbs.shading_model == "TRANSLUCENT":
                 box.row().prop(pbepbs, "translucency")
-            elif pbepbs.shading_model == "TRANSPARENT":
+            if pbepbs.shading_model in ["TRANSPARENT_GLASS", "TRANSPARENT_EMISSIVE"]:
                 box.row().prop(context.material, "alpha", "Transparency")
             box.row()
 
@@ -61,10 +59,8 @@ class PBSMaterial(bpy.types.Panel):
 
         self.layout.separator()
 
-
     def draw_header(self, context):
         self.layout.label(text="", icon="MATERIAL")
-
 
 
 class PBSMatProps(bpy.types.PropertyGroup):
@@ -91,12 +87,13 @@ class PBSMatProps(bpy.types.PropertyGroup):
             ("DEFAULT", "Default", "Default shading model"),
             ("EMISSIVE", "Emissive", "Emissive material"),
             ("CLEARCOAT", "Clear Coat", "Clearcoat shading model e.g. for car paint"),
-            ("TRANSPARENT", "Transparent", "Transparent material"),
+            ("TRANSPARENT_GLASS", "Transparent (Glass)", "Transparent glass material"),
+            ("TRANSPARENT_EMISSIVE", "Transparent (Emissive)", "Transparent emissive material"),
             ("SKIN", "Skin", "Skin material"),
             ("FOLIAGE", "Foliage (Vegetation)", "Two-Sided foliage"),
         ),
         default="DEFAULT"
-        )
+    )
 
     roughness = bpy.props.FloatProperty(
         name="Roughness",
@@ -129,13 +126,13 @@ class PBSMatProps(bpy.types.PropertyGroup):
         name="Translucency",
         description="Makes the material translucent, e.g. for skin and foliage.",
         subtype="FACTOR",
-        default=0.0,min=0.0, max=1.0)
+        default=0.0, min=0.0, max=1.0)
 
     normal_strength = bpy.props.FloatProperty(
-            name="Normalmap Strength",
-            description="Strength of the Normal-Map, a value of 0.0 will cause no "
-                        "normal mapping",
-            subtype="FACTOR", default=0.0, min=0.0, max=1.0)
+        name="Normalmap Strength",
+        description="Strength of the Normal-Map, a value of 0.0 will cause no "
+        "normal mapping",
+        subtype="FACTOR", default=0.0, min=0.0, max=1.0)
 
 
 class OperatorSetDefaultTextures(bpy.types.Operator):
@@ -145,17 +142,22 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
     bl_label = "Fill all materials with default PBS textures"
 
     def execute(self, context):
-        # if not hasattr(context, "material"):
-            # return {'CANCELLED'}
+        slot_types = ["basecolor", "normal", "specular", "roughness"]
 
-        print("Executing default texture operator")
-        # material = context.material
+        print("Setting default textures")
         for material in bpy.data.materials:
-            print("Processing material", material)
-            for index, slot_name in enumerate(["basecolor", "normal", "specular", "roughness"]):
+            for index, slot_name in enumerate(slot_types):
                 slot = material.texture_slots[index]
+
                 if slot is not None and slot.texture is not None:
-                    continue
+                    search = "empty_" + slot_name
+                    if search in slot.name or search in slot.texture.name:
+                        # Don't skip when we found an empty texture, instead
+                        # reassign it
+                        pass
+                    else:
+                        print("Skipping", slot.name)
+                        continue
 
                 slot = material.texture_slots.create(index)
                 texname = "empty_" + slot_name
@@ -173,7 +175,8 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
                             image = bpy.data.images[key]
                             break
                     else:
-                        raise Exception("Loaded " + texname + " from '" + default_pth + "' but it was not loaded into bpy.data.images!")
+                        raise Exception("Loaded " + texname + " from '" + default_pth +
+                                        "' but it was not loaded into bpy.data.images!")
 
                 texture = None
                 for tex in bpy.data.textures:
@@ -192,10 +195,12 @@ class OperatorSetDefaultTextures(bpy.types.Operator):
                     print(msg)
                     slot.texture_coords = "GLOBAL"
                 slot.texture = texture
-        
+                print("Assigned", texture, "to", slot.name)
+
         print("Done.")
 
         return {'FINISHED'}
+
 
 class OperatorFixLampTypes(bpy.types.Operator):
     """ Operator to set use_sphere on all lights """
@@ -209,8 +214,24 @@ class OperatorFixLampTypes(bpy.types.Operator):
             if lamp.type == "POINT":
                 lamp.use_sphere = True
 
+        return {'FINISHED'}
+
+
+class OperatorFixNegativeScale(bpy.types.Operator):
+    """ Operator to fix any negative scale """
+
+    bl_idname = "pbepbs.fix_negative_scale"
+    bl_label = "Fix negative scale on objects"
+
+    def execute(self, context):
+        for obj in bpy.data.objects:
+            sx, sy, sz = obj.scale
+            if sx < 0 or sy < 0 or sz < 0:
+                print("Invalid scale on", obj.name)
+                obj.scale = [abs(sx), abs(sy), abs(sz)]
 
         return {'FINISHED'}
+
 
 class PBSDataPanel(bpy.types.Panel):
 
@@ -240,7 +261,7 @@ class PBSDataPanel(bpy.types.Panel):
             pbs_data = obj_data.pbepbs
 
             box = self.layout.box()
-            
+
             # Header
             row = box.row(align=True)
             row.alignment = 'CENTER'
@@ -257,17 +278,18 @@ class PBSDataPanel(bpy.types.Panel):
             box.row().prop(pbs_data, "use_temperature")
 
             if pbs_data.use_temperature:
-                box.row().prop(pbs_data, "color_temperature")
-                box.row().prop(pbs_data, "color_preview")
+                row = box.row()
+                row.prop(pbs_data, "color_temperature")
+                row.prop(pbs_data, "color_preview", "")
             else:
                 box.row().prop(obj.data, "color", "Color")
 
-            if obj.data.type == "POINT":            
+            if obj.data.type == "POINT":
                 box.row().prop(pbs_data, "sphere_radius")
 
             # Maximum culling distance
             box.row().prop(obj.data, "distance", "Max Cull Distance")
-            
+
             # Light intensity
             box.row().prop(obj.data, "energy", "Intensity (Lumens)")
 
@@ -278,12 +300,16 @@ class PBSDataPanel(bpy.types.Panel):
             # Area light size
             if obj.data.type == "AREA":
                 box.row().prop(obj.data, "shape", "Shape")
-                
+
                 if obj.data.shape == "SQUARE":
                     box.row().prop(obj.data, "size", "Size")
                 else:
                     box.row().prop(obj.data, "size", "Width")
                     box.row().prop(obj.data, "size_y", "Height")
+
+            # IES Profile
+            if obj.data.type in ("SPOT", "POINT"):
+                box.row().prop(pbs_data, "ies_profile", "IES Profile")
 
             # Shadows
             box.row().prop(obj.data, "use_shadow", "Enable Shadows")
@@ -330,6 +356,28 @@ def get_temperature_color_preview(lamp_props):
     # xyY to XYZ, assuming Y=1.
     xyz = mathutils.Vector((x / y, 1, (1 - x - y) / y))
     return xyz_to_rgb * xyz
+
+
+def get_ies_profiles():
+    """ Returns a list of all available ies profiles """
+
+    # XXX: Read dynamically from rp installation
+    profiles = [
+        'area_light.ies', 'bollard.ies', 'cylinder_narrow.ies',
+        'cylinder_wide.ies', 'defined_diffuse.ies', 'defined_diffuse_spot.ies',
+        'defined_spot.ies', 'display.ies', 'jelly_fish.ies', 'medium_scatter.ies', 'overhead.ies',
+        'parallel_beam.ies', 'pear.ies', 'scatter_light.ies', 'soft_arrow.ies',
+        'soft_display.ies', 'star_focused.ies', 'three_lobe_umbrella.ies', 'three_lobe_vee.ies',
+        'tight_focused.ies', 'top_post.ies', 'trapezoid.ies', 'umbrella.ies', 'vee.ies',
+        'x_arrow.ies', 'x_arrow_diffuse.ies', 'x_arrow_soft.ies'
+    ]
+
+    options = [("none", "None", "None")]
+    for profile_id in profiles:
+        name = profile_id.replace(".ies", "").title().replace("_", " ")
+        options.append((profile_id, name, name))
+
+    return options
 
 
 class PBSLampProps(bpy.types.PropertyGroup):
@@ -396,10 +444,18 @@ class PBSLampProps(bpy.types.PropertyGroup):
         max=100.0
     )
 
+    ies_profile = bpy.props.EnumProperty(
+        name="IES Profile",
+        description="IES Lighting profile",
+        items=get_ies_profiles(),
+        default="none",
+    )
+
 
 def register():
     bpy.utils.register_class(OperatorSetDefaultTextures)
     bpy.utils.register_class(OperatorFixLampTypes)
+    bpy.utils.register_class(OperatorFixNegativeScale)
     bpy.utils.register_class(PBSMatProps)
     bpy.utils.register_class(PBSLampProps)
     bpy.utils.register_class(PBSMaterial)
@@ -413,6 +469,7 @@ def unregister():
     del bpy.types.Material.pbepbs
     bpy.utils.unregister_class(OperatorSetDefaultTextures)
     bpy.utils.unregister_class(OperatorFixLampTypes)
+    bpy.utils.unregister_class(OperatorFixNegativeScale)
     bpy.utils.unregister_class(PBSMatProps)
     bpy.utils.unregister_class(PBSLampProps)
     bpy.utils.unregister_class(PBSMaterial)

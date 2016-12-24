@@ -12,6 +12,7 @@ from MaterialWriter import MaterialWriter
 from pybamwriter.panda_types import *
 from pybamwriter.bam_writer import BamWriter
 
+
 class SceneWriter:
 
     """ This class handles the conversion from the blender scene graph to the
@@ -28,6 +29,11 @@ class SceneWriter:
         self.texture_writer = TextureWriter(self)
         self.geometry_writer = GeometryWriter(self)
         self.material_writer = MaterialWriter(self)
+
+    def set_log_instance(self, log_instance):
+        """ Sets the export logger instance, used for reporting warnings and errors
+        during the export """
+        self.log_instance = log_instance
 
     def set_filepath(self, filepath):
         """ Sets the filepath used to store the bam file. In future, the writer
@@ -61,7 +67,10 @@ class SceneWriter:
 
         # Handle all selected objects
         for obj in self.objects:
-            self._handle_object(obj, virtual_model_root)
+            try:
+                self._handle_object(obj, virtual_model_root)
+            except Exception as msg:
+                self.log_instance.error("Exception while exporting object '{}': {}".format(obj.name, msg))
 
         writer = BamWriter()
         writer.file_version = tuple(int(i) for i in self.settings.bam_version.split("."))
@@ -72,18 +81,22 @@ class SceneWriter:
         end_time = time.time()
         duration = round(end_time - start_time, 4)
 
-        print("-" * 79)
-        print("Wrote out bam with the version", writer.file_version)
-        print("Export finished in", duration, "seconds.")
-        print("Exported", format(self._stats_exported_vertices, ",d"), "Vertices and", format(self._stats_exported_tris, ",d"), "Triangles")
-        print("Exported", self._stats_exported_objs, "Objects and", self._stats_exported_geoms, "Geoms")
+        self.log_instance.info("-" * 50)
+        self.log_instance.info("Wrote out bam with the version", writer.file_version)
+        self.log_instance.info("Export finished in", duration, "seconds.")
+        self.log_instance.info("Exported", format(self._stats_exported_vertices, ",d"),
+                               "Vertices and", format(self._stats_exported_tris, ",d"), "Triangles")
+        self.log_instance.info("Exported", self._stats_exported_objs,
+                               "Objects and", self._stats_exported_geoms, "Geoms")
 
         if self._stats_duplicated_vertices:
-            print("Had to duplicate", format(self._stats_duplicated_vertices, ",d"), "Vertices due to different texture coordinates.")
+            self.log_instance.info("Had to duplicate", format(self._stats_duplicated_vertices, ",d"),
+                                   "Vertices due to different texture coordinates.")
 
-        print("Exported", len(self.material_writer.material_state_cache.keys()), "materials")
-        print("Exported", len(self.texture_writer.textures_cache.keys()), "texture slots, using", len(self.texture_writer.images_cache.keys()), "images")
-        print("-" * 79)
+        self.log_instance.info("Exported", len(self.material_writer.material_state_cache), "materials")
+        self.log_instance.info("Exported", len(self.texture_writer.textures_cache),
+                               "texture slots, using", len(self.texture_writer.images_cache), "images")
+        self.log_instance.info("-" * 50)
 
     def _handle_camera(self, obj, parent):
         """ Internal method to handle a camera """
@@ -107,13 +120,13 @@ class SceneWriter:
             if obj.data.shape != "SQUARE":
                 size_y = obj.data.size_y
 
-            parent.transform.mat *= mathutils.Matrix(((0, size_x, 0, 0),
-                                                      (0, 0, size_y, 0),
-                                                      (1, 0, 0, 0),
-                                                      (0, 0, 0, 1)))
-
+            parent.transform.mat *= mathutils.Matrix(
+                ((0, size_x, 0, 0),
+                 (0, 0, size_y, 0),
+                 (1, 0, 0, 0),
+                 (0, 0, 0, 1)))
         else:
-            print("TODO: Support light type:", obj.data.type)
+            self.log_instance.warning("TODO: Support light type:", obj.data.type)
             return
 
         color = obj.data.color
@@ -128,10 +141,12 @@ class SceneWriter:
 
         if obj.data.type in ("SPOT", "POINT"):
             light_node.attenuation = (0, 0, 1)
-    
+            profile = obj.data.pbepbs.ies_profile
+            if profile != "none":
+                light_node.tags["ies_profile"] = profile
+
         light_node.max_distance = obj.data.distance
         parent.add_child(light_node)
-
 
     def _handle_empty(self, obj, parent):
         """ Internal method to handle an empty object """
@@ -139,19 +154,19 @@ class SceneWriter:
 
     def _handle_curve(self, obj, parent):
         """ Internal method to handle a curve """
-        print("TODO: Handle curve:", obj.name)
+        self.log_instance.warning("TODO: Handle curve:", obj.name)
 
     def _handle_font(self, obj, parent):
         """ Internal method to handle a font """
-        print("TODO: Handle font:",obj.name)
+        self.log_instance.warning("TODO: Handle font:", obj.name)
 
     def _handle_lattice(self, obj, parent):
         """ Internal method to handle a lattice """
-        print("TODO: Handle lattice:",obj.name)
+        self.log_instance.warning("TODO: Handle lattice:", obj.name)
 
     def _handle_armature(self, obj, parent):
         """ Internal method to handle a lattice """
-        print("TODO: Handle armature:",obj.name)
+        self.log_instance.warning("TODO: Handle armature:", obj.name)
 
     def _handle_mesh(self, obj, parent):
         """ Internal method to handle a mesh """
@@ -164,7 +179,7 @@ class SceneWriter:
         distances.append(float('inf'))
 
         for i, level in enumerate(obj.lod_levels):
-            lod_node.add_switch(distances[i+1], distances[i])
+            lod_node.add_switch(distances[i + 1], distances[i])
 
             if level.use_mesh:
                 self._handle_object_data(level.object, lod_node)
@@ -180,7 +195,7 @@ class SceneWriter:
         transform.mat = obj.matrix_world
 
         # Create a new panda node with the transform
-        if hasattr(obj,'lod_levels') and len(obj.lod_levels) > 0:
+        if hasattr(obj, 'lod_levels') and len(obj.lod_levels) > 0:
             node = LODNode(obj.name)
             node.transform = transform
             self._handle_lod(obj, node)
@@ -217,17 +232,17 @@ class SceneWriter:
         elif obj.type == "ARMATURE":
             self._handle_armature(obj, parent)
         else:
-            raise ExportException("Object " + obj.name + " has a non implemented type: '" + obj.type + "'")
+            self.log_instance.warning("Skipping object '" + obj.name + "' with unkown type: '" + str(obj.type) + "'")
 
     def _check_dupli(self, obj, parent):
         """ Checks for a dupli group """
         if obj.dupli_type != "NONE":
             if obj.dupli_type != "GROUP":
-                print("Warning: unsupported dupli type:", obj.dupli_type)
+                self.log_instance.warning("Unsupported dupli type:", obj.dupli_type)
                 return
 
             for sub_obj in obj.dupli_group.objects:
-                print("Exporting duplicated object:", sub_obj.name, "for parent", obj.name)
+                self.log_instance.info("Exporting duplicated object:", sub_obj.name, "for parent", obj.name)
                 self._handle_object(sub_obj, parent)
             return
 
@@ -244,10 +259,10 @@ class SceneWriter:
         # by 90 degrees since Blender makes it look in the X axis, Panda in Y.
         loc, rot, scale = obj.matrix_world.decompose()
         node.transform.mat = mathutils.Matrix.Translation(loc) \
-                           * mathutils.Matrix(((0, scale[1], 0, 0),
-                                               (-scale[0], 0, 0, 0),
-                                               (0, 0, scale[2], 0),
-                                               (0, 0, 0, 1)))
+            * mathutils.Matrix(((0, scale[1], 0, 0),
+                                (-scale[0], 0, 0, 0),
+                                (0, 0, scale[2], 0),
+                                (0, 0, 0, 1)))
 
         if orient == 'HALO':
             node.effects = RenderEffects.billboard_point_eye
@@ -260,21 +275,23 @@ class SceneWriter:
         for prop in obj.game.properties:
             name = prop.name
             val = str(prop.value)
-            print("Writing tags", name, val)
+            self.log_instance.info("Writing tags", name, val)
             panda_node.tags[name] = val
 
     def handle_particle_system(self, obj, parent, particle_system):
         """ Internal method to handle a particle system """
 
         if particle_system.settings.render_type != "OBJECT":
-            print("Skipping particle system", particle_system.name, "since it does not use the OBJECT render type.")
+            self.log_instance.error("Skipping particle system '" + particle_system.name +
+                                    "' since it does not use the OBJECT render type.")
             return
 
         settings = particle_system.settings
         duplicated_object = settings.dupli_object
 
         if duplicated_object is None:
-            print("Skipping particle system", particle_system.name, "since it has no dupli-object assigned.")
+            self.log_instance.error("Skipping particle system '" + particle_system.name +
+                                    "' since it has no dupli-object assigned.")
             return
 
         particle_transform = obj.matrix_world.inverted()
@@ -294,4 +311,4 @@ class SceneWriter:
             parent.add_child(node)
             self.geometry_writer.write_mesh(duplicated_object, node)
 
-        print("Wrote", len(particle_system.particles), "particles for system", particle_system.name)
+        self.log_instance.info("Wrote", len(particle_system.particles), "particles for system", particle_system.name)

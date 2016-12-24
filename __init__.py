@@ -26,6 +26,7 @@ sys.path.insert(0, source_dir)
 
 pbe_loaded_module_list = {}
 
+
 def unload_modules():
     """ Unregisters all loaded modules """
     global pbe_loaded_module_list
@@ -33,6 +34,7 @@ def unload_modules():
         print("Bam-Exporter: Unloading module", module_name)
         module_handle.unregister()
         del sys.modules[module_name]
+
 
 def register():
     global pbe_loaded_module_list
@@ -42,8 +44,8 @@ def register():
 
     importlib.invalidate_caches()
 
-    for mod_name in ["Exporter", "PBS", "PBSEngine"]:
-        print("Bam-Exporter: Loading",mod_name, "..")
+    for mod_name in ["Exporter", "PBS", "PBSEngine", "ExportLog"]:
+        print("Bam-Exporter: Loading", mod_name, "..")
         mod = __import__(mod_name)
         mod.register()
         pbe_loaded_module_list[mod_name] = mod

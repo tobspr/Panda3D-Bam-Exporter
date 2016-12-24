@@ -7,13 +7,28 @@ from ExportException import ExportException
 
 from pybamwriter.panda_types import *
 
+
 class MaterialWriter(object):
 
-    def __init__(self, exporter):
-        self.material_state_cache = {}
-        self.exporter = exporter
+    SHADING_MODELS = [
+        "DEFAULT",
+        "EMISSIVE",
+        "CLEARCOAT",
+        "TRANSPARENT_GLASS",
+        "SKIN",
+        "FOLIAGE",
+        "TRANSPARENT_EMISSIVE"
+    ]
 
+    def __init__(self, writer):
+        self.material_state_cache = {}
+        self.writer = writer
         self.make_default_material()
+
+    @property
+    def log_instance(self):
+        """ Helper to access the log instance """
+        return self.writer.log_instance
 
     def make_default_material(self):
         """ Creates the default material """
@@ -43,7 +58,7 @@ class MaterialWriter(object):
 
         # Extract the material properties:
         # In case we use PBS, encode its properties in a special way
-        if not self.exporter.settings.use_pbs:
+        if not self.writer.settings.use_pbs:
             virtual_material.diffuse = (
                 material.diffuse_color[0] * material.diffuse_intensity,
                 material.diffuse_color[1] * material.diffuse_intensity,
@@ -66,15 +81,18 @@ class MaterialWriter(object):
                 1.0)
         else:
             pbepbs = material.pbepbs
-            shading_model_id = (
-                "DEFAULT", "EMISSIVE", "CLEARCOAT", "TRANSPARENT",
-                "SKIN", "FOLIAGE").index(pbepbs.shading_model)
+
+            if pbepbs.shading_model not in self.SHADING_MODELS:
+                self.log_instance.warning("Unkown shading model '" + pbepbs.shading_model + "'")
+                shading_model_id = 0
+            else:
+                shading_model_id = self.SHADING_MODELS.index(pbepbs.shading_model)
 
             # Emissive color contains:
             # (shading_model, normal_strength, arbitrary-0, arbitrary-1)
             # whereas arbitrary depends on the shading model
 
-            if pbepbs.shading_model == "EMISSIVE":
+            if pbepbs.shading_model in ["EMISSIVE", "TRANSPARENT_EMISSIVE"]:
                 virtual_material.base_color = (
                     material.diffuse_color[0] * pbepbs.emissive_factor,
                     material.diffuse_color[1] * pbepbs.emissive_factor,
@@ -82,8 +100,12 @@ class MaterialWriter(object):
                     1.0)
                 virtual_material.metallic = 0
                 virtual_material.roughness = 1
-                virtual_material.refractive_index = 1.0
-                virtual_material.emission = (shading_model_id, 0, 0, 0)
+                virtual_material.refractive_index = 1.51
+
+                if pbepbs.shading_model == "EMISSIVE":
+                    virtual_material.emission = (shading_model_id, 0, 0, 0)
+                else:
+                    virtual_material.emission = (shading_model_id, 0, material.alpha, 0)
 
             else:
                 virtual_material.base_color = (
@@ -99,6 +121,10 @@ class MaterialWriter(object):
 
                 if pbepbs.shading_model == "CLEARCOAT":
                     virtual_material.metallic = 1.0
+                    virtual_material.refractive_index = 1.51
+
+                if pbepbs.shading_model == "TRANSPARENT_GLASS":
+                    virtual_material.metallic = 1.0
 
                 virtual_material.roughness = material.pbepbs.roughness
                 virtual_material.refractive_index = material.pbepbs.ior
@@ -107,7 +133,7 @@ class MaterialWriter(object):
                     arbitrary0, arbitrary1 = 0, 0
                 elif pbepbs.shading_model == "FOLIAGE":
                     arbitrary0, arbitrary1 = material.pbepbs.translucency, 0
-                elif pbepbs.shading_model == "TRANSPARENT":
+                elif pbepbs.shading_model == "TRANSPARENT_GLASS":
                     arbitrary0, arbitrary1 = material.alpha, 0
 
                 virtual_material.emission = (
@@ -126,24 +152,24 @@ class MaterialWriter(object):
 
             if tex_slot:
                 lower_name = tex_slot.name.lower().replace(" ", "")
-                if ("diffuse" in lower_name or
-                    "albedo" in lower_name or
-                    "basecolor" in lower_name):
+                if ("diffuse" in lower_name or "albedo" in lower_name or
+                        "basecolor" in lower_name):
                     use_srgb = True
 
                 if use_srgb:
-                    print("Detected srgb for texture", tex_slot.name)
+                    self.log_instance.info("Detected srgb for texture", tex_slot.name)
                 else:
-                    print("Using standard rgb for texture", tex_slot.name)
-                stage_node = self.exporter.texture_writer.create_stage_node_from_texture_slot(
-                    tex_slot, sort=idx*10, use_srgb=use_srgb)
+                    self.log_instance.info("Using standard rgb for texture", tex_slot.name)
+                stage_node = self.writer.texture_writer.create_stage_node_from_texture_slot(
+                    tex_slot, sort=idx * 10, use_srgb=use_srgb)
                 if stage_node:
                     stage_nodes.append(stage_node)
                 else:
-                    print("WARNING: Invalid texture slot", tex_slot.name)
+                    self.log_instance.warning("Invalid texture slot '" + tex_slot.name +
+                                              "' on material '" + material.name + "', see previous message.")
             else:
                 if idx < 4:
-                    print("WARNING: Empty required texture slot on", material.name)
+                    self.log_instance.warning("Empty required texture slot on material '" + material.name + "'")
 
         # Check if there is at least one texture, and if so, create a texture attrib
         if len(stage_nodes) > 0:
@@ -158,7 +184,7 @@ class MaterialWriter(object):
                 texture_attrib.on_stage_nodes.append(stage)
                 tex_mat_attrib.add_stage(stage.stage, stage._pbe_uv_transform, 0)
 
-                if stage._pbe_uv_transform.scale != (1,1,1):
+                if stage._pbe_uv_transform.scale != (1, 1, 1):
                     has_any_transform = True
 
             virtual_state.attributes.append(texture_attrib)
