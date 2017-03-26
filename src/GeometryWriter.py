@@ -78,7 +78,15 @@ class GeometryWriter:
         self.gvd_formats['index32'].add_column("index", 1, GeomEnums.NT_uint32,
                                                GeomEnums.C_index, start=0, column_alignment=1)
 
-    def _create_geom_from_polygons(self, mesh, polygons, uv_coordinates=None):
+        # Transform blend index format.
+        self.gvd_formats['blend16'] = GeomVertexArrayFormat()
+        self.gvd_formats['blend16'].stride = 2
+        self.gvd_formats['blend16'].total_bytes = self.gvd_formats['blend16'].stride
+        self.gvd_formats['blend16'].pad_to = 1
+        self.gvd_formats['blend16'].add_column("transform_blend", 1, GeomEnums.NT_uint16,
+                                               GeomEnums.C_index, start=0, column_alignment=1)
+
+    def _create_geom_from_polygons(self, obj, mesh, polygons, uv_coordinates=None, char=None):
         """ Creates a Geom from a set of polygons. If uv_coordinates is not None,
         texcoords will be written as well """
 
@@ -109,6 +117,20 @@ class GeometryWriter:
             index_buffer = array('H')  # Unsigned Short
 
         vertex_buffer = array('f')
+
+        jvts = []
+        if char and obj.vertex_groups:
+            for group in obj.vertex_groups:
+                # We need to do this later, since the Character may not have
+                # been created yet.
+                joint = char.find_joint(group.name)
+                jvts.append(JointVertexTransform(joint))
+
+            blend_table = TransformBlendTable()
+            blend_buffer = array('H')
+        else:
+            blend_table = None
+            blend_buffer = None
 
         # Store the location of each mesh vertex
         vertex_mappings = [-1 for i in range(len(vertices))]
@@ -177,6 +199,16 @@ class GeometryWriter:
                 # Store the vertex index in the triangle data
                 index_buffer.append(num_vertices)
 
+                # Store the transform blends.
+                if blend_table:
+                    blend = TransformBlend()
+                    for element in vertex.groups:
+                        if element.weight != 0.0:
+                            blend.add_transform(jvts[element.group], element.weight)
+
+                    index = blend_table.add_blend(blend)
+                    blend_buffer.append(index)
+
                 # Store the vertex index in the mappings and increment the
                 # vertex counter
                 vertex_mappings[vertex_index] = num_vertices
@@ -196,6 +228,8 @@ class GeometryWriter:
         if have_texcoords:
             vertex_format = self.gvd_formats['v3n3t2']
 
+        format = GeomVertexFormat(vertex_format)
+
         # Create the vertex array data, to store the per-vertex data
         array_data = GeomVertexArrayData(vertex_format, GeomEnums.UH_static)
         array_data.buffer += vertex_buffer
@@ -204,9 +238,24 @@ class GeometryWriter:
         index_array_data = GeomVertexArrayData(index_format, GeomEnums.UH_static)
         index_array_data.buffer += index_buffer
 
+        # Create the animation array data, to store transform blend indices
+        if blend_table:
+            blend_table.rows = num_vertices
+
+            blend_format = self.gvd_formats['blend16']
+            format.arrays.append(blend_format)
+            format.animation_type = GeomEnums.AT_panda
+
+            blend_array_data = GeomVertexArrayData(blend_format, GeomEnums.UH_static)
+            blend_array_data.buffer += blend_buffer
+
         # Create the array container for the per-vertex data
-        vertex_data = GeomVertexData("triangle", GeomVertexFormat(vertex_format), GeomEnums.UH_static)
+        vertex_data = GeomVertexData("triangle", format, GeomEnums.UH_static)
         vertex_data.arrays.append(array_data)
+
+        if blend_table:
+            vertex_data.arrays.append(blend_array_data)
+            vertex_data.transform_blend_table = blend_table
 
         # Create the primitive container
         triangles = GeomTriangles(GeomEnums.UH_static)
@@ -236,14 +285,31 @@ class GeometryWriter:
     def write_mesh(self, obj, parent):
         """ Internal method to process a mesh during the export process """
 
+        char = None
+        armature = None
+        restore_armature_modifier = None
+
         for modifier in obj.modifiers:
             if modifier.type == "PARTICLE_SYSTEM":
                 particle_system = modifier.particle_system
                 self.writer.handle_particle_system(obj, parent, particle_system)
 
+            elif modifier.type == "ARMATURE":
+                # The geometry modified by the armature needs to be
+                # parented under the character node.
+                armature = modifier.object.data
+                char = self.writer.characters[armature]
+                parent = char
+
+                if modifier.show_viewport:
+                    # Prevent the modifier from being applied.
+                    modifier.show_viewport = False
+                    restore_armature_modifier = modifier
+
         # Check if we alrady have the geom node cached
-        if obj.data.name in self.geom_cache:
-            virtual_geom_node = self.geom_cache[obj.data.name]
+        key = (obj.data.name, armature)
+        if key in self.geom_cache:
+            virtual_geom_node = self.geom_cache[key]
 
         else:
 
@@ -308,13 +374,16 @@ class GeometryWriter:
                 polygons = polygons_by_material[index]
 
                 # Create a geom from those polygons
-                virtual_geom = self._create_geom_from_polygons(mesh, polygons, active_uv_layer)
+                virtual_geom = self._create_geom_from_polygons(obj, mesh, polygons, active_uv_layer, char=char)
 
                 # Add that geom to the geom node
                 virtual_geom_node.add_geom(virtual_geom, render_state)
 
             bpy.data.meshes.remove(mesh)
 
-            self.geom_cache[obj.data.name] = virtual_geom_node
+            self.geom_cache[key] = virtual_geom_node
 
         parent.add_child(virtual_geom_node)
+
+        if restore_armature_modifier:
+            restore_armature_modifier.show_viewport = True

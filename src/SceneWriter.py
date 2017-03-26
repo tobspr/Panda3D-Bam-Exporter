@@ -30,6 +30,8 @@ class SceneWriter:
         self.geometry_writer = GeometryWriter(self)
         self.material_writer = MaterialWriter(self)
 
+        self.characters = {}
+
     def set_log_instance(self, log_instance):
         """ Sets the export logger instance, used for reporting warnings and errors
         during the export """
@@ -65,12 +67,18 @@ class SceneWriter:
         # Create the root of our model. All objects will be parented to this
         virtual_model_root = ModelRoot("SceneRoot")
 
+        # First import all armatures.
+        for armature in bpy.data.armatures:
+            self.characters[armature] = self._handle_armature(armature, virtual_model_root)
+
         # Handle all selected objects
         for obj in self.objects:
             try:
-                self._handle_object(obj, virtual_model_root)
+                if obj.type != 'ARMATURE':
+                    self._handle_object(obj, virtual_model_root)
             except Exception as msg:
                 self.log_instance.error("Exception while exporting object '{}': {}".format(obj.name, msg))
+                raise
 
         writer = BamWriter()
         writer.file_version = tuple(int(i) for i in self.settings.bam_version.split("."))
@@ -167,13 +175,15 @@ class SceneWriter:
     def _handle_armature(self, obj, parent):
         """ Internal method to handle an armature """
 
-        char = parent
+        char = Character(obj.name)
         bundle = char.bundles[0]
-        bundle.name = obj.data.name
         skeleton = PartGroup(bundle, '<skeleton>')
-        for bone in obj.data.bones:
+        for bone in obj.bones:
             if bone.parent is None:
                 self._handle_bone(bone, char, bundle, skeleton)
+
+        parent.add_child(char)
+        return char
 
     def _handle_bone(self, obj, char, root, parent):
         """ Internal method to handle a bone """
@@ -219,10 +229,6 @@ class SceneWriter:
             node = LODNode(obj.name)
             node.transform = transform
             self._handle_lod(obj, node)
-        elif obj.type == "ARMATURE":
-            node = Character(obj.name)
-            node.transform = transform
-            self._handle_armature(obj, node)
         else:
             node = PandaNode(obj.name)
             node.transform = transform
@@ -254,7 +260,7 @@ class SceneWriter:
         elif obj.type == "LATTICE":
             self._handle_lattice(obj, parent)
         elif obj.type == "ARMATURE":
-            self._handle_armature(obj, parent)
+            pass
         else:
             self.log_instance.warning("Skipping object '" + obj.name + "' with unkown type: '" + str(obj.type) + "'")
 
