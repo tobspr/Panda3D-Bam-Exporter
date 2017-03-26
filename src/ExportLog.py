@@ -66,9 +66,9 @@ class OperatorExportStatus(bpy.types.Operator):
 
 def register():
     bpy.utils.register_class(OperatorExportStatus)
-    bpy.utils.register_class(OperatorExportStatusOk)
+    #bpy.utils.register_class(OperatorExportStatusOk)
 
 
 def unregister():
     bpy.utils.unregister_class(OperatorExportStatus)
-    bpy.utils.unregister_class(OperatorExportStatusOk)
+    #bpy.utils.unregister_class(OperatorExportStatusOk)
