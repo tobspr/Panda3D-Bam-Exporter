@@ -165,8 +165,28 @@ class SceneWriter:
         self.log_instance.warning("TODO: Handle lattice:", obj.name)
 
     def _handle_armature(self, obj, parent):
-        """ Internal method to handle a lattice """
-        self.log_instance.warning("TODO: Handle armature:", obj.name)
+        """ Internal method to handle an armature """
+
+        char = parent
+        bundle = char.bundles[0]
+        bundle.name = obj.data.name
+        skeleton = PartGroup(bundle, '<skeleton>')
+        for bone in obj.data.bones:
+            if bone.parent is None:
+                self._handle_bone(bone, char, bundle, skeleton)
+
+    def _handle_bone(self, obj, char, root, parent):
+        """ Internal method to handle a bone """
+
+        matrix = obj.matrix_local
+        if obj.parent:
+            matrix = obj.parent.matrix_local.inverted() * matrix
+
+        joint = CharacterJoint(char, root, parent, obj.name, matrix)
+        joint.initial_net_transform_inverse = obj.matrix_local.inverted()
+
+        for bone in obj.children:
+            self._handle_bone(bone, char, root, joint)
 
     def _handle_mesh(self, obj, parent):
         """ Internal method to handle a mesh """
@@ -199,6 +219,10 @@ class SceneWriter:
             node = LODNode(obj.name)
             node.transform = transform
             self._handle_lod(obj, node)
+        elif obj.type == "ARMATURE":
+            node = Character(obj.name)
+            node.transform = transform
+            self._handle_armature(obj, node)
         else:
             node = PandaNode(obj.name)
             node.transform = transform
