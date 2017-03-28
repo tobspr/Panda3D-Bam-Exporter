@@ -13,6 +13,14 @@ from pybamwriter.panda_types import *
 from pybamwriter.bam_writer import BamWriter
 
 
+class DummyCurve:
+    def __init__(self, value):
+        self.value = value
+
+    def evaluate(self, i):
+        return self.value
+
+
 class SceneWriter:
 
     """ This class handles the conversion from the blender scene graph to the
@@ -183,6 +191,30 @@ class SceneWriter:
                 self._handle_bone(bone, char, bundle, skeleton)
 
         parent.add_child(char)
+
+        # Is there an active animation?  Find any instances of this armature.
+        action = None
+        pose = None
+        for scene_obj in self.objects:
+            if scene_obj.data == obj and scene_obj.animation_data and scene_obj.animation_data.action:
+                action = scene_obj.animation_data.action
+                pose = scene_obj.pose
+                break
+
+        if action:
+            fps = bpy.context.scene.render.fps
+            num_frames = int(action.frame_range[1]) - 1
+            bundle = AnimBundle(action.name, fps, num_frames)
+
+            # Create the AnimGroup hierarchy.
+            skeleton = AnimGroup(bundle, '<skeleton>')
+
+            for bone in obj.bones:
+                if bone.parent is None:
+                    self._handle_bone_anim(bone, pose, action.fcurves, skeleton)
+
+            parent.add_child(AnimBundleNode(obj.name, bundle))
+
         return char
 
     def _handle_bone(self, obj, char, root, parent):
@@ -197,6 +229,79 @@ class SceneWriter:
 
         for bone in obj.children:
             self._handle_bone(bone, char, root, joint)
+
+    def _handle_bone_anim(self, bone, pose, fcurves, parent):
+        """ Internal method to handle the animation of a bone """
+
+        # Find all f-curves belonging to this bone.
+        prefix = 'pose.bones["{0}"].'.format(bone.name)
+        num_frames = parent.root.num_frames
+
+        bone_matrix = bone.matrix_local
+        if bone.parent:
+            bone_matrix = bone.parent.matrix_local.inverted() * bone_matrix
+
+        pose_bone = pose.bones[bone.name]
+
+        lx_curve = fcurves.find(prefix + 'location', 0) or DummyCurve(pose_bone.location.x)
+        ly_curve = fcurves.find(prefix + 'location', 1) or DummyCurve(pose_bone.location.y)
+        lz_curve = fcurves.find(prefix + 'location', 2) or DummyCurve(pose_bone.location.z)
+        qw_curve = fcurves.find(prefix + 'rotation_quaternion', 0) or DummyCurve(pose_bone.rotation_quaternion.w)
+        qx_curve = fcurves.find(prefix + 'rotation_quaternion', 1) or DummyCurve(pose_bone.rotation_quaternion.x)
+        qy_curve = fcurves.find(prefix + 'rotation_quaternion', 2) or DummyCurve(pose_bone.rotation_quaternion.y)
+        qz_curve = fcurves.find(prefix + 'rotation_quaternion', 3) or DummyCurve(pose_bone.rotation_quaternion.z)
+        sx_curve = fcurves.find(prefix + 'scale', 0) or DummyCurve(pose_bone.scale.x)
+        sy_curve = fcurves.find(prefix + 'scale', 1) or DummyCurve(pose_bone.scale.y)
+        sz_curve = fcurves.find(prefix + 'scale', 2) or DummyCurve(pose_bone.scale.z)
+
+        group = AnimChannelMatrixXfmTable(parent, bone.name)
+        tables = group.tables
+
+        for i in range(num_frames):
+            matrix = mathutils.Matrix(((sx_curve.evaluate(i), 0, 0, 0),
+                                        (0, sy_curve.evaluate(i), 0, 0),
+                                        (0, 0, sz_curve.evaluate(i), 0),
+                                        (0, 0, 0, 1)))
+
+            matrix = mathutils.Quaternion((qw_curve.evaluate(i),
+                                           qx_curve.evaluate(i),
+                                           qy_curve.evaluate(i),
+                                           qz_curve.evaluate(i))).to_matrix().to_4x4() * matrix
+
+            matrix = mathutils.Matrix.Translation((lx_curve.evaluate(i),
+                                                   ly_curve.evaluate(i),
+                                                   lz_curve.evaluate(i))) * matrix
+            matrix = bone_matrix * matrix
+
+            loc, rot, scale = matrix.decompose()
+            prh = rot.to_euler('YXZ')
+            tables[6].append(math.degrees(prh[2]))
+            tables[7].append(math.degrees(prh[0]))
+            tables[8].append(math.degrees(prh[1]))
+
+            tables[9].append(loc[0])
+            tables[10].append(loc[1])
+            tables[11].append(loc[2])
+
+            tables[0].append(scale[0])
+            tables[1].append(scale[1])
+            tables[2].append(scale[2])
+
+        # Reduce tables down to single item if they are all the same.
+        for table in tables:
+            if len(table) > 1 and table.count(table[0]) == len(table):
+                table[1:] = []
+
+        # Clear the tables if they are containing default values.
+        for table in tables[:3]:
+            if table == [1]:
+                table.clear()
+        for table in tables[3:12]:
+            if table == [0]:
+                table.clear()
+
+        for child in bone.children:
+            self._handle_bone_anim(child, pose, fcurves, group)
 
     def _handle_mesh(self, obj, parent):
         """ Internal method to handle a mesh """
