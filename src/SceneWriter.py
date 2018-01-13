@@ -153,7 +153,7 @@ class SceneWriter:
         light_node.specular_color = light_node.color
         light_node.shadow_caster = obj.data.use_shadow
         light_node.sb_xsize = int(obj.data.pbepbs.shadow_map_res)
-        light_node.sb_ysize = light_node.sb_ysize
+        light_node.sb_ysize = light_node.sb_xsize
 
         if obj.data.type in ("SPOT", "POINT"):
             light_node.attenuation = (0, 0, 1)
